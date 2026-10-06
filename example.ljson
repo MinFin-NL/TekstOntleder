@@ -6,7 +6,7 @@
   "provenance_spans": [
     {
       "start_idx": 0,
-      "end_idx": 128,
+      "end_idx": 130,
       "source_type": "human",
       "metadata": {
         "author_name": "Sander van den Berg",
@@ -17,8 +17,8 @@
       }
     },
     {
-      "start_idx": 129,
-      "end_idx": 232,
+      "start_idx": 131,
+      "end_idx": 234,
       "source_type": "ai",
       "metadata": {
         "model_identifier": "claude-3-5-sonnet-20240620",
@@ -33,7 +33,7 @@
       }
     },
     {
-      "start_idx": 233,
+      "start_idx": 235,
       "end_idx": 366,
       "source_type": "copied",
       "metadata": {
@@ -47,7 +47,7 @@
     },
     {
       "start_idx": 367,
-      "end_idx": 456,
+      "end_idx": 457,
       "source_type": "ai",
       "metadata": {
         "model_identifier": "ollama/llama3-8b-instruct",

@@ -79,3 +79,17 @@ def test_upload_with_edited_text_reports_mismatch():
     integrity = res.json()["integrity"]
     assert integrity["status"] == "mismatch"
     assert integrity["computed_hash"] != doc["document_hash"]
+
+
+@pytest.mark.parametrize("variant", ["example", "nested"])
+def test_example_spans_do_not_cut_through_words(variant):
+    # Real documents may split a word (autocomplete finishing one), but the hand-written
+    # examples mark whole words and sentences; an off-by-one there shows as a letter
+    # left outside its highlight.
+    body = client.get("/api/document", params={"variant": variant}).json()
+    text = body["text"]
+    for span in body["provenance_spans"]:
+        start, end = span["start_idx"], span["end_idx"]
+        assert text[start].isalnum(), f"span {start}-{end} starts on {text[start]!r}"
+        assert not (start > 0 and text[start - 1].isalnum()), f"span {start}-{end} starts mid-word"
+        assert not (end < len(text) and text[end - 1].isalnum() and text[end].isalnum()), f"span {start}-{end} ends mid-word"
