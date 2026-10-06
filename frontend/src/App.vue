@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef } from 'vue'
 import FilterPanel from './components/FilterPanel.vue'
 import IntegrityStatus from './components/IntegrityStatus.vue'
+import ReportView from './components/ReportView.vue'
 import SegmentList from './components/SegmentList.vue'
 import SpanPopover from './components/SpanPopover.vue'
 import UploadPanel from './components/UploadPanel.vue'
@@ -119,6 +120,28 @@ function onUploaded(doc: DocumentResponse, fileName: string) {
   load.value = { status: 'ready', doc, fileName }
 }
 
+// The report replaces the document view in place, so an uploaded document survives the switch.
+const view = ref<'document' | 'report'>('document')
+const reportView = ref<InstanceType<typeof ReportView> | null>(null)
+const reportButton = ref<HTMLElement | null>(null)
+
+async function openReport() {
+  onClose()
+  view.value = 'report'
+  await nextTick()
+  reportView.value?.focus()
+}
+
+function printReport() {
+  window.print()
+}
+
+async function closeReport() {
+  view.value = 'document'
+  await nextTick()
+  reportButton.value?.focus()
+}
+
 function onOnly(type: SourceType | null) {
   visible.value = { human: !type || type === 'human', ai: !type || type === 'ai', copied: !type || type === 'copied' }
 }
@@ -128,7 +151,7 @@ function onOnly(type: SourceType | null) {
   <nldd-page background="tinted" sticky-header>
     <nldd-top-navigation-bar slot="header" website-title="TekstOntleder"></nldd-top-navigation-bar>
 
-    <div class="to-layout">
+    <div :class="['to-layout', { 'to-layout--report': view === 'report' }]">
       <div class="to-intro">
         <nldd-title
           size="2"
@@ -139,7 +162,7 @@ function onOnly(type: SourceType | null) {
         ></nldd-title>
       </div>
 
-      <aside class="to-sidebar" aria-label="Weergave-instellingen">
+      <aside v-show="view === 'document'" class="to-sidebar" aria-label="Weergave-instellingen">
         <FilterPanel :visible="visible" :stats="stats" :total="total" @toggle="onToggle" @only="onOnly" />
         <UploadPanel @loaded="onUploaded" />
         <p class="to-text--sm to-variant-link">
@@ -157,19 +180,37 @@ function onOnly(type: SourceType | null) {
           text="Het document kon niet worden geladen"
           :supporting-text="load.message"
         ></nldd-banner>
-        <nldd-card v-else accessible-label="Document">
-          <nldd-container padding="24" gap="16">
-            <nldd-title
-              size="4"
-              heading-level="2"
-              :text="load.doc.document_id"
-              :supporting-text="`${load.fileName ? `${load.fileName} · ` : ''}${load.doc.format_version} · ${load.doc.provenance_spans.length} fragmenten`"
-            ></nldd-title>
-            <IntegrityStatus :integrity="load.doc.integrity" :document-hash="load.doc.document_hash" />
-            <nldd-divider></nldd-divider>
-            <p class="to-document"><SegmentList :segments="segments" :inside-highlight="false" /></p>
-          </nldd-container>
-        </nldd-card>
+        <template v-else>
+          <div class="to-toolbar">
+            <nldd-button
+              v-if="view === 'document'"
+              ref="reportButton"
+              variant="secondary"
+              size="sm"
+              start-icon="file-text"
+              text="Herkomstrapport"
+              @click="openReport"
+            ></nldd-button>
+            <template v-else>
+              <nldd-button variant="secondary" size="sm" start-icon="arrow-left" text="Terug naar het document" @click="closeReport"></nldd-button>
+              <nldd-button variant="primary" size="sm" start-icon="printer" text="Afdrukken of opslaan als pdf" @click="printReport"></nldd-button>
+            </template>
+          </div>
+          <nldd-card v-if="view === 'document'" accessible-label="Document">
+            <nldd-container padding="24" gap="16">
+              <nldd-title
+                size="4"
+                heading-level="2"
+                :text="load.doc.document_id"
+                :supporting-text="`${load.fileName ? `${load.fileName} · ` : ''}${load.doc.format_version} · ${load.doc.provenance_spans.length} fragmenten`"
+              ></nldd-title>
+              <IntegrityStatus :integrity="load.doc.integrity" :document-hash="load.doc.document_hash" />
+              <nldd-divider></nldd-divider>
+              <p class="to-document"><SegmentList :segments="segments" :inside-highlight="false" /></p>
+            </nldd-container>
+          </nldd-card>
+          <ReportView v-else ref="reportView" :doc="load.doc" :file-name="load.fileName" :stats="stats" :total="total" />
+        </template>
       </main>
     </div>
 

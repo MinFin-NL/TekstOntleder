@@ -45,6 +45,8 @@ body {
     'intro intro'
     'side main';
   gap: var(--primitives-space-24);
+  /* A flex item of nldd-page's main: auto margins alone would shrink it to its content. */
+  width: 100%;
   max-width: 76rem;
   margin: 0 auto;
   padding: var(--primitives-space-32) var(--primitives-space-24) var(--primitives-space-64);
@@ -52,7 +54,14 @@ body {
 }
 .to-intro { grid-area: intro; }
 .to-sidebar { grid-area: side; display: flex; flex-direction: column; gap: var(--primitives-space-16); }
-.to-main { grid-area: main; min-width: 0; }
+.to-main { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: var(--primitives-space-16); }
+.to-toolbar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--primitives-space-8); }
+
+/* Report view: no sidebar, the report takes the full width. */
+.to-layout.to-layout--report {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'intro' 'main';
+}
 
 @media (max-width: 52rem) {
   .to-layout {
@@ -187,4 +196,36 @@ body {
   margin: 0;
   font-size: var(--primitives-font-size-80);
   overflow-wrap: anywhere;
+}
+/* Monospace runs wide; one step down keeps it level with the text beside it. */
+.to-code { font-family: var(--primitives-font-family-monospace); font-size: var(--primitives-font-size-70); }
+
+/* ── Report ──────────────────────────────────────────────────────────────── */
+/* Focus moves here when the report opens; the outline only shows for keyboard focus. */
+.to-report:focus:not(:focus-visible) { outline: none; }
+.to-report:focus-visible {
+  outline: var(--semantics-focus-ring-outline);
+  outline-offset: var(--semantics-focus-ring-outline-offset);
+}
+.to-report__section { display: flex; flex-direction: column; gap: var(--primitives-space-12); }
+
+/* ── Print ───────────────────────────────────────────────────────────────── */
+/* On screen nldd-page scrolls inside itself at viewport height (see the rule at
+   the top); on paper that would cut everything after the first page. Outer
+   styles win over :host, so the page and its ancestors grow with the content. */
+@media print {
+  html,
+  body,
+  #app { height: auto; }
+  nldd-page { height: auto; overflow: visible; }
+
+  .to-intro,
+  .to-sidebar,
+  .to-toolbar { display: none; }
+  .to-layout { display: block; max-width: none; padding: 0; }
+
+  /* Keep the source tints: they carry meaning, and browsers drop backgrounds by default. */
+  .to-span,
+  nldd-tag { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  nldd-table-row { break-inside: avoid; }
 }

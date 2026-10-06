@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { INTEGRITY_LABELS, shortHash as short } from '../lib/integrity'
 import type { Integrity } from '../types/ljson'
 
 const props = defineProps<{ integrity: Integrity; documentHash: string }>()
-
-// Long enough to compare by eye, short enough not to wrap in the header.
-const short = (hash: string) => (hash.length > 16 ? `${hash.slice(0, 12)}…` : hash)
 
 const shown = computed(() => {
   switch (props.integrity.status) {
@@ -13,7 +11,7 @@ const shown = computed(() => {
       return {
         color: 'success',
         icon: 'check-circle-filled',
-        label: 'Hash klopt',
+        label: INTEGRITY_LABELS.match,
         explanation:
           'De tekst is ongewijzigd sinds de hash is berekend. Dit is geen ondertekening: wie de tekst aanpast, kan ook de hash opnieuw berekenen.',
       }
@@ -21,7 +19,7 @@ const shown = computed(() => {
       return {
         color: 'warning',
         icon: 'exclamation-triangle-filled',
-        label: 'Hash niet te controleren',
+        label: INTEGRITY_LABELS.unknown_format,
         explanation: 'De vastgelegde hash is geen SHA-256-waarde, dus de tekst kan er niet mee worden vergeleken.',
       }
     default:
