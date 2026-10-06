@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef } from 'vue'
 import ActorFilter from './components/ActorFilter.vue'
 import FilterPanel from './components/FilterPanel.vue'
+import FragmentNav from './components/FragmentNav.vue'
 import IntegrityStatus from './components/IntegrityStatus.vue'
 import ReportView from './components/ReportView.vue'
 import SegmentList from './components/SegmentList.vue'
@@ -54,6 +55,68 @@ const segments = computed(() => {
   return segmentText(text, buildSpanTree(provenance_spans, text))
 })
 const stats = computed(() => attributionStats(segments.value))
+
+/** Every rendered span by id, to resolve a `mark#span-<id>` back to its node. */
+const nodesById = computed(() => {
+  const map = new Map<string, SpanNode>()
+  const walk = (nodes: readonly SpanNode[]) => nodes.forEach((n) => (map.set(n.id, n), walk(n.children)))
+  for (const seg of segments.value) if (seg.kind === 'span') walk([seg.node])
+  return map
+})
+
+const documentEl = ref<HTMLElement | null>(null)
+const fragmentNav = ref<InstanceType<typeof FragmentNav> | null>(null)
+
+/**
+ * nldd-popover takes focus when it opens and hands it back to where it came
+ * from when it closes, also when a click elsewhere closes it. Jumping while it
+ * is open would see that hand-back land after the new focus, so close it first
+ * and wait for its close event (or a frame or two, if it was already closing).
+ */
+let popoverClosed: (() => void) | null = null
+function closePopover(): Promise<void> {
+  // Our state, not :popover-open: after a click elsewhere the popover is already
+  // hidden, but its close event (and the focus hand-back) has yet to arrive.
+  if (!shown.value) {
+    onClose()
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => done(), 200)
+    const done = () => {
+      window.clearTimeout(timeout)
+      popoverClosed = null
+      resolve()
+    }
+    popoverClosed = done
+    onClose()
+  })
+}
+
+async function onJump(id: string, el: HTMLElement) {
+  const node = nodesById.value.get(id)
+  if (!node) return
+  await closePopover()
+  el.focus({ preventScroll: true })
+  el.scrollIntoView({ block: 'center' })
+  onActivate(node, el)
+}
+
+function onPopoverClose() {
+  onClose()
+  popoverClosed?.()
+}
+
+// J/K only while a fragment or its open details have focus: a single-key
+// shortcut must not fire while typing elsewhere (WCAG 2.1.4).
+function onFragmentKey(e: KeyboardEvent) {
+  if (e.altKey || e.ctrlKey || e.metaKey || !(e.target instanceof HTMLElement)) return
+  if (!e.target.matches('mark[id^="span-"]') && !e.target.closest('nldd-popover')) return
+  const direction = e.key === 'j' || e.key === 'J' ? 1 : e.key === 'k' || e.key === 'K' ? -1 : 0
+  if (!direction) return
+  e.preventDefault()
+  fragmentNav.value?.jump(direction)
+}
 // Whitespace around unknown gaps is in no category, so the shares add up to 100%.
 const total = computed(() => Object.values(stats.value).reduce((a, b) => a + b, 0))
 
@@ -230,7 +293,8 @@ function onOnly(type: SourceType | null) {
               ></nldd-title>
               <IntegrityStatus :integrity="load.doc.integrity" :document-hash="load.doc.document_hash" />
               <nldd-divider></nldd-divider>
-              <p class="to-document"><SegmentList :segments="segments" :inside-highlight="false" /></p>
+              <FragmentNav ref="fragmentNav" :root="documentEl" :active-id="shown?.node.id ?? null" @jump="onJump" />
+              <p ref="documentEl" class="to-document" @keydown="onFragmentKey"><SegmentList :segments="segments" :inside-highlight="false" /></p>
             </nldd-container>
           </nldd-card>
           <ReportView v-else ref="reportView" :doc="load.doc" :file-name="load.fileName" :stats="stats" :total="total" />
@@ -241,7 +305,8 @@ function onOnly(type: SourceType | null) {
     <SpanPopover
       :node="shown?.node ?? null"
       :anchor="shown?.anchor ?? null"
-      @close="onClose"
+      @close="onPopoverClose"
+      @keydown="onFragmentKey"
       @pointerenter="clearTimers"
       @pointerleave="active?.pinned || onLeave()"
     />
