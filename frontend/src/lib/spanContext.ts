@@ -5,6 +5,8 @@ import type { SpanNode } from './segment'
 /** Shared with every level of the recursive SegmentList, so events need not be re-emitted per level. */
 export interface SpanContext {
   visible: Ref<Visibility>
+  /** Whether a span is marked: its source and every actor it belongs to are switched on. */
+  isShown: (node: SpanNode) => boolean
   activeId: Ref<string | null>
   onHover: (node: SpanNode, el: HTMLElement) => void
   onLeave: () => void

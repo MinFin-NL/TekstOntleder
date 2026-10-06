@@ -84,6 +84,8 @@ body {
 /* NLDD has no checkbox group: a real fieldset + legend carries the semantics. */
 .to-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .to-fieldset legend { padding: 0; margin-bottom: var(--primitives-space-12); }
+/* A group heading inside a card that already has a title: smaller, semibold. */
+.to-legend { font-weight: var(--primitives-font-weight-body-semi-bold); }
 
 /* ── Inline text helpers (nldd-text is display: block) ───────────────────── */
 .to-text--sm { font-size: var(--primitives-font-size-80); }

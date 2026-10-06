@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef } from 'vue'
+import ActorFilter from './components/ActorFilter.vue'
 import FilterPanel from './components/FilterPanel.vue'
 import IntegrityStatus from './components/IntegrityStatus.vue'
 import ReportView from './components/ReportView.vue'
 import SegmentList from './components/SegmentList.vue'
 import SpanPopover from './components/SpanPopover.vue'
 import UploadPanel from './components/UploadPanel.vue'
+import { actorKeys, listActors } from './lib/actors'
 import { attributionStats, buildSpanTree, segmentText, type SpanNode } from './lib/segment'
 import { spanContextKey } from './lib/spanContext'
-import type { DocumentResponse, SourceType, Visibility } from './types/ljson'
+import type { DocumentResponse, ProvenanceSpan, SourceType, Visibility } from './types/ljson'
 
 const HOVER_OPEN_MS = 150
 const HOVER_CLOSE_MS = 250
@@ -30,6 +32,8 @@ interface Active {
 
 const load = shallowRef<LoadState>({ status: 'loading' })
 const visible = ref<Visibility>({ human: true, ai: true, copied: true, none: true })
+/** Actor keys (see lib/actors) switched off. Kept as "hidden" so a new document starts with everyone shown. */
+const hiddenActors = ref<Record<string, boolean>>({})
 const active = shallowRef<Active | null>(null)
 
 const controller = new AbortController()
@@ -53,8 +57,14 @@ const stats = computed(() => attributionStats(segments.value))
 // Whitespace around unknown gaps is in no category, so the shares add up to 100%.
 const total = computed(() => Object.values(stats.value).reduce((a, b) => a + b, 0))
 
+const actors = computed(() => (load.value.status === 'ready' ? listActors(load.value.doc.provenance_spans) : { people: [], models: [] }))
+
+function isSpanShown(span: ProvenanceSpan): boolean {
+  return visible.value[span.source_type] && !actorKeys(span).some((key) => hiddenActors.value[key])
+}
+
 // A span that is filtered out can no longer anchor its popover.
-const shown = computed(() => (active.value && visible.value[active.value.node.span.source_type] ? active.value : null))
+const shown = computed(() => (active.value && isSpanShown(active.value.node.span) ? active.value : null))
 
 let openTimer: number | undefined
 let closeTimer: number | undefined
@@ -104,6 +114,7 @@ function onClose() {
 
 provide(spanContextKey, {
   visible,
+  isShown: (node) => isSpanShown(node.span),
   activeId: computed(() => shown.value?.node.id ?? null),
   onHover,
   onLeave,
@@ -114,10 +125,15 @@ function onToggle(type: keyof Visibility, checked: boolean) {
   visible.value = { ...visible.value, [type]: checked }
 }
 
+function onActorToggle(key: string, checked: boolean) {
+  hiddenActors.value = { ...hiddenActors.value, [key]: !checked }
+}
+
 function onUploaded(doc: DocumentResponse, fileName: string) {
   // An upload replaces the example, also when that is still loading.
   controller.abort()
   onClose()
+  hiddenActors.value = {}
   load.value = { status: 'ready', doc, fileName }
 }
 
@@ -165,6 +181,13 @@ function onOnly(type: SourceType | null) {
 
       <aside v-show="view === 'document'" class="to-sidebar" aria-label="Weergave-instellingen">
         <FilterPanel :visible="visible" :stats="stats" :total="total" @toggle="onToggle" @only="onOnly" />
+        <ActorFilter
+          :people="actors.people"
+          :models="actors.models"
+          :hidden="hiddenActors"
+          @toggle="onActorToggle"
+          @reset="hiddenActors = {}"
+        />
         <UploadPanel @loaded="onUploaded" />
         <p class="to-text--sm to-variant-link">
           <a v-if="load.status === 'ready' && load.fileName" href="?">Terug naar het voorbeeld</a>

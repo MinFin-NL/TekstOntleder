@@ -14,7 +14,7 @@ const props = defineProps<{
 
 const ctx = inject(spanContextKey)!
 
-const isShown = (node: SpanNode) => ctx.visible.value[node.span.source_type]
+const isShown = ctx.isShown
 
 /** A top-level gap with text in it, to be marked as unknown provenance; null when it stays plain. */
 function unknownGap(text: string) {
