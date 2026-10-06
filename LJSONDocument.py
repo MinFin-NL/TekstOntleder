@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # --- Metadata Schemas ---
@@ -35,8 +35,17 @@ class CopiedMetadata(BaseModel):
 # --- Span Schemas ---
 
 class BaseSpan(BaseModel):
-    start_idx: int
+    # Indexes count Unicode code points (Python str), end exclusive.
+    start_idx: int = Field(ge=0)
     end_idx: int
+
+    @model_validator(mode='after')
+    def check_order(self) -> 'BaseSpan':
+        if self.end_idx <= self.start_idx:
+            raise ValueError(
+                f"Span end_idx ({self.end_idx}) must be greater than start_idx ({self.start_idx})"
+            )
+        return self
 
 
 class HumanSpan(BaseSpan):
@@ -73,9 +82,6 @@ class LJSONDocument(BaseModel):
     text: str
     provenance_spans: List[ProvenanceSpan]
 
-    # Optional: Add a validator to ensure spans don't exceed text length
-    from pydantic import model_validator
-
     @model_validator(mode='after')
     def check_span_bounds(self) -> 'LJSONDocument':
         text_length = len(self.text)
@@ -84,4 +90,22 @@ class LJSONDocument(BaseModel):
                 raise ValueError(
                     f"Span end_idx ({span.end_idx}) exceeds text length ({text_length})"
                 )
+        return self
+
+    @model_validator(mode='after')
+    def check_no_partial_overlap(self) -> 'LJSONDocument':
+        # Spans may nest or sit side by side, but never cross: LJSON 1.0 has no
+        # meaning for text that belongs to two sources neither of which contains the other.
+        ordered = sorted(self.provenance_spans, key=lambda s: (s.start_idx, -s.end_idx))
+        open_spans: List[BaseSpan] = []
+        for span in ordered:
+            while open_spans and open_spans[-1].end_idx <= span.start_idx:
+                open_spans.pop()
+            if open_spans and span.end_idx > open_spans[-1].end_idx:
+                outer = open_spans[-1]
+                raise ValueError(
+                    f"Span [{span.start_idx}, {span.end_idx}) partially overlaps "
+                    f"span [{outer.start_idx}, {outer.end_idx})"
+                )
+            open_spans.append(span)
         return self

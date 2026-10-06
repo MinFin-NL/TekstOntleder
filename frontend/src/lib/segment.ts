@@ -5,6 +5,7 @@ export interface SpanNode {
   /** Stable key: index of the span in `provenance_spans` (plus a suffix for split pieces). */
   id: string
   span: ProvenanceSpan
+  /** UTF-16 offsets into the text, ready for `String.prototype.slice`. */
   start: number
   end: number
   children: SpanNode[]
@@ -28,22 +29,34 @@ function byPosition(a: Pending, b: Pending): number {
 }
 
 /**
+ * LJSON indexes count Unicode code points (Python `len`), JS strings count
+ * UTF-16 code units. Returns a converter from the former to the latter,
+ * clamped to the text. Without astral characters the two are identical.
+ */
+export function codePointToUtf16(text: string): (index: number) => number {
+  const offsets = [0]
+  for (const ch of text) offsets.push(offsets[offsets.length - 1] + ch.length)
+  const last = offsets.length - 1
+  if (last === text.length) return (i) => Math.max(0, Math.min(i, last))
+  return (i) => offsets[Math.max(0, Math.min(i, last))]
+}
+
+/** Length of a string in code points, the unit LJSON indexes and users count in. */
+export const codePointLength = (text: string): number => Array.from(text).length
+
+/**
  * Builds a forest of spans by index containment. A span that lies entirely
- * inside another becomes its child. Spans are clamped to the text, and empty
- * spans are dropped.
+ * inside another becomes its child. Span indexes are code points; they are
+ * converted to UTF-16 offsets and clamped to the text, and empty spans are dropped.
  *
  * Partial overlaps are out of scope for LJSON 1.0, but rather than producing
  * crossing tags the overlapping span is split at the parent's boundary: the
  * inner piece becomes a child, the remainder is placed after the parent.
  */
-export function buildSpanTree(spans: readonly ProvenanceSpan[], textLength: number): SpanNode[] {
+export function buildSpanTree(spans: readonly ProvenanceSpan[], text: string): SpanNode[] {
+  const toUtf16 = codePointToUtf16(text)
   const queue: Pending[] = spans
-    .map((span, i) => ({
-      id: String(i),
-      span,
-      start: Math.max(0, Math.min(span.start_idx, textLength)),
-      end: Math.max(0, Math.min(span.end_idx, textLength)),
-    }))
+    .map((span, i) => ({ id: String(i), span, start: toUtf16(span.start_idx), end: toUtf16(span.end_idx) }))
     .filter((p) => p.end > p.start)
     .sort(byPosition)
 
@@ -92,12 +105,12 @@ export function segmentText(text: string, nodes: readonly SpanNode[], start = 0,
   return out
 }
 
-/** Characters attributed to each source, counting each character once by its innermost span. */
+/** Code points attributed to each source, counting each character once by its innermost span. */
 export function attributionStats(segments: readonly Segment[]): Record<SourceType | 'none', number> {
   const totals: Record<SourceType | 'none', number> = { human: 0, ai: 0, copied: 0, none: 0 }
   const walk = (segs: readonly Segment[], owner: SourceType | 'none') => {
     for (const seg of segs) {
-      if (seg.kind === 'text') totals[owner] += seg.end - seg.start
+      if (seg.kind === 'text') totals[owner] += codePointLength(seg.text)
       else walk(seg.children, seg.node.span.source_type)
     }
   }

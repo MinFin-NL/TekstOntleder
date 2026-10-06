@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef } from '
 import FilterPanel from './components/FilterPanel.vue'
 import SegmentList from './components/SegmentList.vue'
 import SpanPopover from './components/SpanPopover.vue'
-import { attributionStats, buildSpanTree, segmentText, type SpanNode } from './lib/segment'
+import { attributionStats, buildSpanTree, codePointLength, segmentText, type SpanNode } from './lib/segment'
 import { spanContextKey } from './lib/spanContext'
 import type { LJSONDocument, SourceType } from './types/ljson'
 
@@ -40,10 +40,10 @@ onMounted(async () => {
 const segments = computed(() => {
   if (load.value.status !== 'ready') return []
   const { text, provenance_spans } = load.value.doc
-  return segmentText(text, buildSpanTree(provenance_spans, text.length))
+  return segmentText(text, buildSpanTree(provenance_spans, text))
 })
 const stats = computed(() => attributionStats(segments.value))
-const total = computed(() => (load.value.status === 'ready' ? load.value.doc.text.length : 0))
+const total = computed(() => (load.value.status === 'ready' ? codePointLength(load.value.doc.text) : 0))
 
 // A span that is filtered out can no longer anchor its popover.
 const shown = computed(() => (active.value && visible.value[active.value.node.span.source_type] ? active.value : null))

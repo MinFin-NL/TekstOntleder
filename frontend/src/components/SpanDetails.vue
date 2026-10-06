@@ -50,7 +50,7 @@ const rows = computed<Row[]>(() => {
   <nldd-container padding="16" gap="12">
     <div class="to-row">
       <nldd-tag :color="source.tagColor" size="sm" :text="source.label"></nldd-tag>
-      <span class="to-text--sm to-text--subtle">Tekens {{ node.start }}–{{ node.end }}</span>
+      <span class="to-text--sm to-text--subtle">Tekens {{ node.span.start_idx }}–{{ node.span.end_idx }}</span>
     </div>
     <dl class="to-meta">
       <div v-for="[label, value] in rows" :key="label" class="to-meta__row">
