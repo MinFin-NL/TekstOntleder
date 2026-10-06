@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field, model_validator
+from pydantic_core import PydanticCustomError
 
 
 # --- Metadata Schemas ---
@@ -42,8 +43,10 @@ class BaseSpan(BaseModel):
     @model_validator(mode='after')
     def check_order(self) -> 'BaseSpan':
         if self.end_idx <= self.start_idx:
-            raise ValueError(
-                f"Span end_idx ({self.end_idx}) must be greater than start_idx ({self.start_idx})"
+            raise PydanticCustomError(
+                'span_order',
+                'Span end_idx ({end_idx}) must be greater than start_idx ({start_idx})',
+                {'start_idx': self.start_idx, 'end_idx': self.end_idx},
             )
         return self
 
@@ -62,8 +65,6 @@ class CopiedSpan(BaseSpan):
     source_type: Literal["copied"]
     metadata: CopiedMetadata
 
-
-# --- The Discriminated Union ---
 # Pydantic will check the 'source_type' field first,
 # then route validation to the specific class above.
 
@@ -72,8 +73,6 @@ ProvenanceSpan = Annotated[
     Field(discriminator="source_type")
 ]
 
-
-# --- Root Document Schema ---
 
 class LJSONDocument(BaseModel):
     document_id: str
@@ -85,10 +84,12 @@ class LJSONDocument(BaseModel):
     @model_validator(mode='after')
     def check_span_bounds(self) -> 'LJSONDocument':
         text_length = len(self.text)
-        for span in self.provenance_spans:
+        for i, span in enumerate(self.provenance_spans):
             if span.end_idx > text_length:
-                raise ValueError(
-                    f"Span end_idx ({span.end_idx}) exceeds text length ({text_length})"
+                raise PydanticCustomError(
+                    'span_bounds',
+                    'Span {index}: end_idx ({end_idx}) exceeds text length ({text_length})',
+                    {'index': i, 'end_idx': span.end_idx, 'text_length': text_length},
                 )
         return self
 
@@ -96,16 +97,23 @@ class LJSONDocument(BaseModel):
     def check_no_partial_overlap(self) -> 'LJSONDocument':
         # Spans may nest or sit side by side, but never cross: LJSON 1.0 has no
         # meaning for text that belongs to two sources neither of which contains the other.
-        ordered = sorted(self.provenance_spans, key=lambda s: (s.start_idx, -s.end_idx))
-        open_spans: List[BaseSpan] = []
-        for span in ordered:
-            while open_spans and open_spans[-1].end_idx <= span.start_idx:
+        ordered = sorted(
+            enumerate(self.provenance_spans), key=lambda item: (item[1].start_idx, -item[1].end_idx)
+        )
+        open_spans: List[tuple[int, BaseSpan]] = []
+        for i, span in ordered:
+            while open_spans and open_spans[-1][1].end_idx <= span.start_idx:
                 open_spans.pop()
-            if open_spans and span.end_idx > open_spans[-1].end_idx:
-                outer = open_spans[-1]
-                raise ValueError(
-                    f"Span [{span.start_idx}, {span.end_idx}) partially overlaps "
-                    f"span [{outer.start_idx}, {outer.end_idx})"
+            if open_spans and span.end_idx > open_spans[-1][1].end_idx:
+                j, outer = open_spans[-1]
+                raise PydanticCustomError(
+                    'span_overlap',
+                    'Span {index} [{start_idx}, {end_idx}) partially overlaps '
+                    'span {other_index} [{other_start_idx}, {other_end_idx})',
+                    {
+                        'index': i, 'start_idx': span.start_idx, 'end_idx': span.end_idx,
+                        'other_index': j, 'other_start_idx': outer.start_idx, 'other_end_idx': outer.end_idx,
+                    },
                 )
-            open_spans.append(span)
+            open_spans.append((i, span))
         return self

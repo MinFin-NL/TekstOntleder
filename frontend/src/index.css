@@ -20,6 +20,16 @@
   --to-copied-line-style: dashed;
 }
 
+/* nldd-page is height: 100% and, with sticky-header, scrolls inside its own
+   .page__scroll behind overflow: hidden. Without a definite height up the
+   chain the page grows with its content, the inner scroller never overflows
+   and wheel/trackpad scrolling does nothing. */
+html,
+body,
+#app {
+  height: 100%;
+}
+
 body {
   margin: 0;
   font-family: var(--primitives-font-family-body);
@@ -65,6 +75,23 @@ body {
 .to-text--xs { font-size: var(--primitives-font-size-70); }
 .to-text--subtle { color: var(--semantics-content-secondary-color); }
 .to-variant-link { margin: 0; }
+
+/* Integrity status: the tag stays on one line, the explanation wraps beside it. */
+.to-integrity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--primitives-space-4) var(--primitives-space-8);
+}
+
+/* Validation issues inside an nldd-banner (light DOM, so styled here). */
+.to-issue-list {
+  margin: 0;
+  padding-inline-start: var(--primitives-space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--primitives-space-4);
+}
 .to-variant-link a { color: var(--semantics-content-accent-color); }
 
 .to-visually-hidden {

@@ -1,7 +1,7 @@
 {
   "document_id": "doc_minfin_4091a_nested",
   "format_version": "LJSON_1.0",
-  "document_hash": "b4e8f1c3d9a7h5j2k4l6",
+  "document_hash": "f2180992f5ea953fc75b39f2bc74f9f5b1e4b741b5f910ae6b4343f81903ad68",
   "text": "De architectuur van de nieuwe rapportagetool vereist een veilige data-integratie met de bestaande systemen van de Belastingdienst. Daarnaast maken we gebruik van een lokaal gehoste LLM om de privacy van persoonsgegevens te waarborgen. Dit model draait op OpenShift en maakt gebruik van RAG (Retrieval-Augmented Generation) om actuele beleidsdocumenten te ontsluiten. De frontend wordt gebouwd met het NL Design System, specifiek gericht op toegankelijkheid.",
   "provenance_spans": [
     {

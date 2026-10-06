@@ -59,3 +59,15 @@ export interface LJSONDocument {
   text: string
   provenance_spans: ProvenanceSpan[]
 }
+
+/** Mirrors backend/integrity.py: `document_hash` checked as SHA-256 over the UTF-8 text. */
+export interface Integrity {
+  algorithm: 'sha256'
+  computed_hash: string
+  status: 'match' | 'mismatch' | 'unknown_format'
+}
+
+/** What /api/document returns: the document as stored, plus the server's integrity check. */
+export interface DocumentResponse extends LJSONDocument {
+  integrity: Integrity
+}

@@ -1,18 +1,24 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef } from 'vue'
 import FilterPanel from './components/FilterPanel.vue'
+import IntegrityStatus from './components/IntegrityStatus.vue'
 import SegmentList from './components/SegmentList.vue'
 import SpanPopover from './components/SpanPopover.vue'
+import UploadPanel from './components/UploadPanel.vue'
 import { attributionStats, buildSpanTree, codePointLength, segmentText, type SpanNode } from './lib/segment'
 import { spanContextKey } from './lib/spanContext'
-import type { LJSONDocument, SourceType } from './types/ljson'
+import type { DocumentResponse, SourceType } from './types/ljson'
 
 const HOVER_OPEN_MS = 150
 const HOVER_CLOSE_MS = 250
 
 const variant = new URLSearchParams(window.location.search).get('voorbeeld') === 'genest' ? 'nested' : 'example'
 
-type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; doc: LJSONDocument }
+type LoadState =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  /** `fileName` is set when the document was uploaded rather than one of the examples. */
+  | { status: 'ready'; doc: DocumentResponse; fileName?: string }
 
 interface Active {
   node: SpanNode
@@ -30,7 +36,7 @@ onMounted(async () => {
   try {
     const res = await fetch(`/api/document?variant=${variant}`, { signal: controller.signal })
     if (!res.ok) throw new Error(`De server gaf status ${res.status}.`)
-    load.value = { status: 'ready', doc: (await res.json()) as LJSONDocument }
+    load.value = { status: 'ready', doc: (await res.json()) as DocumentResponse }
   } catch (err) {
     if (controller.signal.aborted) return
     load.value = { status: 'error', message: err instanceof Error ? err.message : String(err) }
@@ -54,9 +60,18 @@ function clearTimers() {
   window.clearTimeout(openTimer)
   window.clearTimeout(closeTimer)
 }
+// A hover popover lives in the top layer, outside nldd-page's scroller: once it
+// sits under the pointer it swallows the wheel and the page stops scrolling.
+// Scrolling therefore dismisses it (a pinned one stays) and cancels a pending open.
+function onWheel() {
+  clearTimers()
+  if (active.value && !active.value.pinned) active.value = null
+}
+onMounted(() => window.addEventListener('wheel', onWheel, { passive: true }))
 onBeforeUnmount(() => {
   controller.abort()
   clearTimers()
+  window.removeEventListener('wheel', onWheel)
 })
 
 function onHover(node: SpanNode, anchor: HTMLElement) {
@@ -97,6 +112,13 @@ function onToggle(type: SourceType, checked: boolean) {
   visible.value = { ...visible.value, [type]: checked }
 }
 
+function onUploaded(doc: DocumentResponse, fileName: string) {
+  // An upload replaces the example, also when that is still loading.
+  controller.abort()
+  onClose()
+  load.value = { status: 'ready', doc, fileName }
+}
+
 function onOnly(type: SourceType | null) {
   visible.value = { human: !type || type === 'human', ai: !type || type === 'ai', copied: !type || type === 'copied' }
 }
@@ -119,14 +141,16 @@ function onOnly(type: SourceType | null) {
 
       <aside class="to-sidebar" aria-label="Weergave-instellingen">
         <FilterPanel :visible="visible" :stats="stats" :total="total" @toggle="onToggle" @only="onOnly" />
+        <UploadPanel @loaded="onUploaded" />
         <p class="to-text--sm to-variant-link">
-          <a v-if="variant === 'nested'" href="?">Terug naar het standaardvoorbeeld</a>
+          <a v-if="load.status === 'ready' && load.fileName" href="?">Terug naar het voorbeeld</a>
+          <a v-else-if="variant === 'nested'" href="?">Terug naar het standaardvoorbeeld</a>
           <a v-else href="?voorbeeld=genest">Bekijk het voorbeeld met geneste fragmenten</a>
         </p>
       </aside>
 
       <main class="to-main">
-        <nldd-activity-indicator v-if="load.status === 'loading'" accessible-label="Document wordt geladen"></nldd-activity-indicator>
+        <nldd-activity-indicator v-if="load.status === 'loading'" text="Document wordt geladen"></nldd-activity-indicator>
         <nldd-banner
           v-else-if="load.status === 'error'"
           variant="critical"
@@ -139,8 +163,9 @@ function onOnly(type: SourceType | null) {
               size="4"
               heading-level="2"
               :text="load.doc.document_id"
-              :supporting-text="`${load.doc.format_version} · hash ${load.doc.document_hash} · ${load.doc.provenance_spans.length} fragmenten`"
+              :supporting-text="`${load.fileName ? `${load.fileName} · ` : ''}${load.doc.format_version} · ${load.doc.provenance_spans.length} fragmenten`"
             ></nldd-title>
+            <IntegrityStatus :integrity="load.doc.integrity" :document-hash="load.doc.document_hash" />
             <nldd-divider></nldd-divider>
             <p class="to-document"><SegmentList :segments="segments" :inside-highlight="false" /></p>
           </nldd-container>
