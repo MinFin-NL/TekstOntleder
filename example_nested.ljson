@@ -1,0 +1,99 @@
+{
+  "document_id": "doc_minfin_4091a_nested",
+  "format_version": "LJSON_1.0",
+  "document_hash": "b4e8f1c3d9a7h5j2k4l6",
+  "text": "De architectuur van de nieuwe rapportagetool vereist een veilige data-integratie met de bestaande systemen van de Belastingdienst. Daarnaast maken we gebruik van een lokaal gehoste LLM om de privacy van persoonsgegevens te waarborgen. Dit model draait op OpenShift en maakt gebruik van RAG (Retrieval-Augmented Generation) om actuele beleidsdocumenten te ontsluiten. De frontend wordt gebouwd met het NL Design System, specifiek gericht op toegankelijkheid.",
+  "provenance_spans": [
+    {
+      "start_idx": 0,
+      "end_idx": 128,
+      "source_type": "human",
+      "metadata": {
+        "author_name": "Sander van den Berg",
+        "author_email": "s.vandenberg@minfin.nl",
+        "department": "Directie Informatievoorziening",
+        "typing_speed_wpm": 62,
+        "timestamp": "2026-10-06T08:10:00Z"
+      }
+    },
+    {
+      "start_idx": 129,
+      "end_idx": 232,
+      "source_type": "ai",
+      "metadata": {
+        "model_identifier": "claude-3-5-sonnet-20240620",
+        "trigger_agent": "s.vandenberg@minfin.nl",
+        "parameters": {
+          "temperature": 0.4,
+          "top_p": 0.9
+        },
+        "prompt_hash": "a1b2c3d4e5f6g7h8i9j0",
+        "generation_time_ms": 1450,
+        "timestamp": "2026-10-06T08:12:35Z"
+      }
+    },
+    {
+      "start_idx": 233,
+      "end_idx": 366,
+      "source_type": "copied",
+      "metadata": {
+        "original_doc_name": "AI_Infrastructuur_Definitief.pdf",
+        "original_doc_hash": "x9y8z7w6v5u4t3s2r1q0",
+        "original_start_idx": 1024,
+        "copied_by_name": "Lieke de Vries",
+        "copied_by_email": "l.devries@minfin.nl",
+        "timestamp": "2026-10-06T09:45:12Z"
+      }
+    },
+    {
+      "start_idx": 367,
+      "end_idx": 456,
+      "source_type": "ai",
+      "metadata": {
+        "model_identifier": "ollama/llama3-8b-instruct",
+        "trigger_agent": "editor_autocomplete",
+        "invoked_by": "l.devries@minfin.nl",
+        "parameters": {
+          "temperature": 0.1,
+          "top_p": 0.95
+        },
+        "prompt_hash": "m1n2o3p4q5r6s7t8u9v0",
+        "timestamp": "2026-10-06T09:48:05Z"
+      }
+    },
+    {
+      "start_idx": 166,
+      "end_idx": 184,
+      "source_type": "human",
+      "metadata": {
+        "author_name": "Sander van den Berg",
+        "author_email": "s.vandenberg@minfin.nl",
+        "department": "Directie Informatievoorziening",
+        "timestamp": "2026-10-06T08:14:02Z"
+      }
+    },
+    {
+      "start_idx": 255,
+      "end_idx": 264,
+      "source_type": "human",
+      "metadata": {
+        "author_name": "Lieke de Vries",
+        "author_email": "l.devries@minfin.nl",
+        "timestamp": "2026-10-06T09:46:30Z"
+      }
+    },
+    {
+      "start_idx": 440,
+      "end_idx": 456,
+      "source_type": "copied",
+      "metadata": {
+        "original_doc_name": "Toegankelijkheidsverklaring_2026.docx",
+        "original_doc_hash": "k3j4h5g6f7d8s9a0p1o2",
+        "original_start_idx": 312,
+        "copied_by_name": "Lieke de Vries",
+        "copied_by_email": "l.devries@minfin.nl",
+        "timestamp": "2026-10-06T09:49:11Z"
+      }
+    }
+  ]
+}

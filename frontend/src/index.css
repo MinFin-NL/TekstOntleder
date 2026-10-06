@@ -1,0 +1,163 @@
+/* NLDD design system — fonts, reset and tokens on :root. The scheme is pinned
+   to light on <html data-scheme="light">; every rule below uses tokens, so
+   dark mode is one attribute away. */
+@import '@nldd/design-system/styles';
+
+/* ── Source colours ──────────────────────────────────────────────────────── */
+/* Rijkshuisstijl categories: groen = mens, paars = AI, lichtblauw = gekopieerd.
+   Tinted backgrounds keep body text well above 4.5:1; the filled tone is the
+   strong line colour for underlines. Each source also has its own line style
+   so the distinction never rests on colour alone (WCAG 1.4.1). */
+:root {
+  --to-human-fill: var(--semantics-categories-groen-tinted-background-color);
+  --to-human-line: var(--semantics-categories-groen-filled-background-color);
+  --to-human-line-style: solid;
+  --to-ai-fill: var(--semantics-categories-paars-tinted-background-color);
+  --to-ai-line: var(--semantics-categories-paars-filled-background-color);
+  --to-ai-line-style: dotted;
+  --to-copied-fill: var(--semantics-categories-lichtblauw-tinted-background-color);
+  --to-copied-line: var(--semantics-categories-lichtblauw-filled-background-color);
+  --to-copied-line-style: dashed;
+}
+
+body {
+  margin: 0;
+  font-family: var(--primitives-font-family-body);
+  background: var(--semantics-surfaces-tinted-background-color);
+  color: var(--semantics-content-color);
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.to-layout {
+  display: grid;
+  grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+  grid-template-areas:
+    'intro intro'
+    'side main';
+  gap: var(--primitives-space-24);
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: var(--primitives-space-32) var(--primitives-space-24) var(--primitives-space-64);
+  box-sizing: border-box;
+}
+.to-intro { grid-area: intro; }
+.to-sidebar { grid-area: side; display: flex; flex-direction: column; gap: var(--primitives-space-16); }
+.to-main { grid-area: main; min-width: 0; }
+
+@media (max-width: 52rem) {
+  .to-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'intro' 'main' 'side';
+    padding-inline: var(--primitives-space-16);
+  }
+}
+
+.to-row { display: flex; align-items: center; gap: var(--primitives-space-8); }
+.to-row--wrap { flex-wrap: wrap; }
+.to-stack { display: flex; flex-direction: column; gap: var(--primitives-space-8); }
+
+/* NLDD has no checkbox group: a real fieldset + legend carries the semantics. */
+.to-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.to-fieldset legend { padding: 0; margin-bottom: var(--primitives-space-12); }
+
+/* ── Inline text helpers (nldd-text is display: block) ───────────────────── */
+.to-text--sm { font-size: var(--primitives-font-size-80); }
+.to-text--xs { font-size: var(--primitives-font-size-70); }
+.to-text--subtle { color: var(--semantics-content-secondary-color); }
+.to-variant-link { margin: 0; }
+.to-variant-link a { color: var(--semantics-content-accent-color); }
+
+.to-visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+/* ── Document text ───────────────────────────────────────────────────────── */
+.to-document {
+  margin: 0;
+  max-width: var(--semantics-text-max-width);
+  font-size: var(--primitives-font-size-100);
+  line-height: 2;
+}
+
+.to-span {
+  color: inherit;
+  background: none;
+  cursor: help;
+  --to-fill: transparent;
+  --to-line: currentColor;
+  --to-line-style: solid;
+}
+.to-span--human  { --to-fill: var(--to-human-fill);  --to-line: var(--to-human-line);  --to-line-style: var(--to-human-line-style); }
+.to-span--ai     { --to-fill: var(--to-ai-fill);     --to-line: var(--to-ai-line);     --to-line-style: var(--to-ai-line-style); }
+.to-span--copied { --to-fill: var(--to-copied-fill); --to-line: var(--to-copied-line); --to-line-style: var(--to-copied-line-style); }
+
+/* Outermost visible span: background tint plus a thin rule in its line style. */
+.to-span--fill {
+  background-color: var(--to-fill);
+  border-bottom: var(--primitives-border-width-regular) var(--to-line-style) var(--to-line);
+  border-radius: var(--primitives-corner-radius-xxs);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+/* Nested span: never a second background, a thick underline in its own colour. */
+.to-span--underline {
+  text-decoration-line: underline;
+  text-decoration-color: var(--to-line);
+  text-decoration-style: var(--to-line-style);
+  text-decoration-thickness: var(--primitives-space-3);
+  text-underline-offset: var(--primitives-space-4);
+  text-decoration-skip-ink: none;
+}
+.to-span--underline .to-span--underline { text-underline-offset: var(--primitives-space-10); }
+
+.to-span:focus-visible {
+  outline: var(--semantics-focus-ring-outline);
+  outline-offset: var(--semantics-focus-ring-outline-offset);
+}
+.to-span--fill.is-active { box-shadow: inset 0 calc(-1 * var(--primitives-space-3)) 0 var(--to-line); }
+.to-span--underline.is-active { text-decoration-thickness: var(--primitives-space-4); }
+
+/* ── Sidebar legend / stats ──────────────────────────────────────────────── */
+.to-swatch {
+  flex: none;
+  width: var(--primitives-space-12);
+  height: var(--primitives-space-12);
+  border-radius: var(--primitives-corner-radius-xxs);
+  background: var(--to-swatch-fill);
+  border: var(--primitives-border-width-regular) var(--to-swatch-style) var(--to-swatch-line);
+}
+.to-swatch--human  { --to-swatch-fill: var(--to-human-fill);  --to-swatch-line: var(--to-human-line);  --to-swatch-style: var(--to-human-line-style); }
+.to-swatch--ai     { --to-swatch-fill: var(--to-ai-fill);     --to-swatch-line: var(--to-ai-line);     --to-swatch-style: var(--to-ai-line-style); }
+.to-swatch--copied { --to-swatch-fill: var(--to-copied-fill); --to-swatch-line: var(--to-copied-line); --to-swatch-style: var(--to-copied-line-style); }
+
+.to-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--primitives-space-6);
+}
+.to-stats li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--primitives-space-8); }
+.to-sample {
+  cursor: default;
+  font-size: var(--primitives-font-size-80);
+  padding-inline: var(--primitives-space-4);
+}
+
+/* ── Popover metadata ────────────────────────────────────────────────────── */
+.to-meta { margin: 0; display: flex; flex-direction: column; gap: var(--primitives-space-8); }
+.to-meta__row { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--primitives-space-8); }
+.to-meta dt {
+  font-size: var(--primitives-font-size-80);
+  color: var(--semantics-content-secondary-color);
+}
+.to-meta dd {
+  margin: 0;
+  font-size: var(--primitives-font-size-80);
+  overflow-wrap: anywhere;
+}
