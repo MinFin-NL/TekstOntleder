@@ -1,10 +1,10 @@
 import type { InjectionKey, Ref } from 'vue'
-import type { SourceType } from '../types/ljson'
+import type { Visibility } from '../types/ljson'
 import type { SpanNode } from './segment'
 
 /** Shared with every level of the recursive SegmentList, so events need not be re-emitted per level. */
 export interface SpanContext {
-  visible: Ref<Record<SourceType, boolean>>
+  visible: Ref<Visibility>
   activeId: Ref<string | null>
   onHover: (node: SpanNode, el: HTMLElement) => void
   onLeave: () => void

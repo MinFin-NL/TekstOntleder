@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ProvenanceSpan, SourceType } from '../types/ljson'
-import { attributionStats, buildSpanTree, codePointToUtf16, segmentText, type Segment } from './segment'
+import { attributionStats, buildSpanTree, codePointToUtf16, segmentText, splitGap, type Segment } from './segment'
 
 const span = (source_type: SourceType, start_idx: number, end_idx: number) =>
   ({ source_type, start_idx, end_idx, metadata: {} }) as unknown as ProvenanceSpan
@@ -68,5 +68,20 @@ describe('code-point indexes', () => {
   it('counts code points, not UTF-16 units', () => {
     const segs = segmentText(text, buildSpanTree([span('ai', 1, 2), span('human', 4, 6)], text))
     expect(attributionStats(segs)).toEqual({ ai: 1, human: 2, copied: 0, none: 3 })
+  })
+})
+
+describe('unknown provenance', () => {
+  it('splits a gap into surrounding whitespace and its core', () => {
+    expect(splitGap('  twee woorden\n')).toEqual({ lead: '  ', core: 'twee woorden', trail: '\n' })
+    expect(splitGap('   ')).toEqual({ lead: '   ', core: '', trail: '' })
+    expect(splitGap('')).toEqual({ lead: '', core: '', trail: '' })
+  })
+
+  it('does not count whitespace around a gap as unknown, but does count it within the gap', () => {
+    const text = 'Een. Twee. Drie zonder bron. Vier.'
+    const segs = segmentText(text, buildSpanTree([span('human', 0, 4), span('ai', 5, 10), span('human', 29, 34)], text))
+    // ' ' after "Een." and after "Twee." are whitespace-only gaps; ' Drie zonder bron. ' has the core 'Drie zonder bron.' (17).
+    expect(attributionStats(segs)).toEqual({ human: 9, ai: 5, copied: 0, none: 17 })
   })
 })

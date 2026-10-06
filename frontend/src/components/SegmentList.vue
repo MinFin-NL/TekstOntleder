@@ -1,18 +1,27 @@
 <script setup lang="ts">
 import { inject } from 'vue'
-import type { Segment, SpanNode } from '../lib/segment'
+import { splitGap, type Segment, type SpanNode } from '../lib/segment'
 import { spanContextKey } from '../lib/spanContext'
-import { SOURCES } from '../lib/sources'
+import { SOURCES, UNKNOWN_LABEL } from '../lib/sources'
 
 const props = defineProps<{
   segments: Segment[]
   /** True when a highlighted ancestor already paints a background. */
   insideHighlight: boolean
+  /** True below any span, shown or filtered out: its gaps belong to that span, not to "unknown". */
+  owned?: boolean
 }>()
 
 const ctx = inject(spanContextKey)!
 
 const isShown = (node: SpanNode) => ctx.visible.value[node.span.source_type]
+
+/** A top-level gap with text in it, to be marked as unknown provenance; null when it stays plain. */
+function unknownGap(text: string) {
+  if (props.owned || !ctx.visible.value.none) return null
+  const gap = splitGap(text)
+  return gap.core ? gap : null
+}
 
 function classes(node: SpanNode) {
   // Never stack backgrounds: the outermost visible span is filled, nested ones are underlined.
@@ -47,7 +56,18 @@ function onKey(node: SpanNode, e: KeyboardEvent) {
      own line so the compiler's whitespace condensing drops the newlines. -->
 <template>
   <template v-for="seg in segments" :key="seg.kind === 'text' ? `t${seg.start}` : seg.node.id">
-    <span v-if="seg.kind === 'text'">{{ seg.text }}</span>
+    <template v-if="seg.kind === 'text'">
+      <template v-if="unknownGap(seg.text)">
+        <span>{{ unknownGap(seg.text)!.lead }}</span>
+        <mark class="to-span to-span--none to-span--fill">
+          <span class="to-visually-hidden">[{{ UNKNOWN_LABEL }}: </span>
+          <span>{{ unknownGap(seg.text)!.core }}</span>
+          <span class="to-visually-hidden">]</span>
+        </mark>
+        <span>{{ unknownGap(seg.text)!.trail }}</span>
+      </template>
+      <span v-else>{{ seg.text }}</span>
+    </template>
     <mark
       v-else-if="isShown(seg.node)"
       :id="`span-${seg.node.id}`"
@@ -60,10 +80,10 @@ function onKey(node: SpanNode, e: KeyboardEvent) {
       @keydown.space="onKey(seg.node, $event)"
     >
       <span class="to-visually-hidden">[{{ SOURCES[seg.node.span.source_type].label }}: </span>
-      <SegmentList :segments="seg.children" :inside-highlight="true" />
+      <SegmentList :segments="seg.children" :inside-highlight="true" owned />
       <span class="to-visually-hidden">]</span>
     </mark>
     <!-- A source that is filtered out keeps its text but loses its mark and tooltip. -->
-    <SegmentList v-else :segments="seg.children" :inside-highlight="insideHighlight" />
+    <SegmentList v-else :segments="seg.children" :inside-highlight="insideHighlight" owned />
   </template>
 </template>

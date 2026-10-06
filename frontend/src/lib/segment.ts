@@ -105,12 +105,26 @@ export function segmentText(text: string, nodes: readonly SpanNode[], start = 0,
   return out
 }
 
-/** Code points attributed to each source, counting each character once by its innermost span. */
+/**
+ * Splits a gap outside every span into its leading whitespace, the rest, and
+ * its trailing whitespace. Only `core` is text of unknown provenance: the space
+ * between two attributed sentences is not a source of its own.
+ */
+export function splitGap(text: string): { lead: string; core: string; trail: string } {
+  const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text)!
+  return { lead, core, trail }
+}
+
+/**
+ * Code points attributed to each source, counting each character once by its
+ * innermost span. `none` counts text outside every span, without the whitespace
+ * around it (see `splitGap`), so the totals add up to what is marked.
+ */
 export function attributionStats(segments: readonly Segment[]): Record<SourceType | 'none', number> {
   const totals: Record<SourceType | 'none', number> = { human: 0, ai: 0, copied: 0, none: 0 }
   const walk = (segs: readonly Segment[], owner: SourceType | 'none') => {
     for (const seg of segs) {
-      if (seg.kind === 'text') totals[owner] += codePointLength(seg.text)
+      if (seg.kind === 'text') totals[owner] += codePointLength(owner === 'none' ? splitGap(seg.text).core : seg.text)
       else walk(seg.children, seg.node.span.source_type)
     }
   }

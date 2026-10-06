@@ -6,9 +6,9 @@ import ReportView from './components/ReportView.vue'
 import SegmentList from './components/SegmentList.vue'
 import SpanPopover from './components/SpanPopover.vue'
 import UploadPanel from './components/UploadPanel.vue'
-import { attributionStats, buildSpanTree, codePointLength, segmentText, type SpanNode } from './lib/segment'
+import { attributionStats, buildSpanTree, segmentText, type SpanNode } from './lib/segment'
 import { spanContextKey } from './lib/spanContext'
-import type { DocumentResponse, SourceType } from './types/ljson'
+import type { DocumentResponse, SourceType, Visibility } from './types/ljson'
 
 const HOVER_OPEN_MS = 150
 const HOVER_CLOSE_MS = 250
@@ -29,7 +29,7 @@ interface Active {
 }
 
 const load = shallowRef<LoadState>({ status: 'loading' })
-const visible = ref<Record<SourceType, boolean>>({ human: true, ai: true, copied: true })
+const visible = ref<Visibility>({ human: true, ai: true, copied: true, none: true })
 const active = shallowRef<Active | null>(null)
 
 const controller = new AbortController()
@@ -50,7 +50,8 @@ const segments = computed(() => {
   return segmentText(text, buildSpanTree(provenance_spans, text))
 })
 const stats = computed(() => attributionStats(segments.value))
-const total = computed(() => (load.value.status === 'ready' ? codePointLength(load.value.doc.text) : 0))
+// Whitespace around unknown gaps is in no category, so the shares add up to 100%.
+const total = computed(() => Object.values(stats.value).reduce((a, b) => a + b, 0))
 
 // A span that is filtered out can no longer anchor its popover.
 const shown = computed(() => (active.value && visible.value[active.value.node.span.source_type] ? active.value : null))
@@ -109,7 +110,7 @@ provide(spanContextKey, {
   onActivate,
 })
 
-function onToggle(type: SourceType, checked: boolean) {
+function onToggle(type: keyof Visibility, checked: boolean) {
   visible.value = { ...visible.value, [type]: checked }
 }
 
@@ -143,7 +144,7 @@ async function closeReport() {
 }
 
 function onOnly(type: SourceType | null) {
-  visible.value = { human: !type || type === 'human', ai: !type || type === 'ai', copied: !type || type === 'copied' }
+  visible.value = { human: !type || type === 'human', ai: !type || type === 'ai', copied: !type || type === 'copied', none: !type }
 }
 </script>
 

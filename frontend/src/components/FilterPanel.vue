@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { SOURCES } from '../lib/sources'
-import { SOURCE_TYPES, type SourceType } from '../types/ljson'
+import { SOURCES, UNKNOWN_LABEL } from '../lib/sources'
+import { SOURCE_TYPES, type SourceType, type Visibility } from '../types/ljson'
 
 const props = defineProps<{
-  visible: Record<SourceType, boolean>
+  visible: Visibility
   stats: Record<SourceType | 'none', number>
   total: number
 }>()
 
 const emit = defineEmits<{
-  toggle: [type: SourceType, checked: boolean]
+  toggle: [type: keyof Visibility, checked: boolean]
   only: [type: SourceType | null]
 }>()
 
@@ -35,6 +35,16 @@ const pct = (n: number) => (props.total ? Math.round((n / props.total) * 100) : 
               @change="emit('toggle', type, $event.detail.checked)"
             ></nldd-checkbox-field>
           </div>
+          <div class="to-row">
+            <span class="to-swatch to-swatch--none" aria-hidden="true"></span>
+            <nldd-checkbox-field
+              name="bron"
+              value="none"
+              label="Tekst zonder herkomstgegevens"
+              :checked="visible.none"
+              @change="emit('toggle', 'none', $event.detail.checked)"
+            ></nldd-checkbox-field>
+          </div>
         </div>
       </fieldset>
       <div class="to-row to-row--wrap">
@@ -52,7 +62,7 @@ const pct = (n: number) => (props.total ? Math.round((n / props.total) * 100) : 
             </span>
           </li>
           <li>
-            <span class="to-sample">Onbekend</span>
+            <span class="to-sample to-span to-span--none to-span--fill">{{ UNKNOWN_LABEL }}</span>
             <span class="to-text--sm">
               {{ pct(stats.none) }}% <span class="to-text--subtle">({{ stats.none }} tekens)</span>
             </span>
@@ -60,7 +70,8 @@ const pct = (n: number) => (props.total ? Math.round((n / props.total) * 100) : 
         </ul>
         <span class="to-text--xs to-text--subtle">
           Een fragment binnen een ander fragment krijgt een onderstreping in plaats van een achtergrondkleur. Elke bron
-          heeft een eigen lijnstijl: doorgetrokken (mens), gestippeld (AI) of gestreept (gekopieerd).
+          heeft een eigen lijnstijl: doorgetrokken (mens), gestippeld (AI), gestreept (gekopieerd) of dubbel (herkomst
+          onbekend). Witruimte tussen fragmenten telt niet mee.
         </span>
       </div>
     </nldd-container>

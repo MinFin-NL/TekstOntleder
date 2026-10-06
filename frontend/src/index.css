@@ -18,6 +18,12 @@
   --to-copied-fill: var(--semantics-categories-lichtblauw-tinted-background-color);
   --to-copied-line: var(--semantics-categories-lichtblauw-filled-background-color);
   --to-copied-line-style: dashed;
+  /* Text outside every span: not a source, so a neutral tone. A double line
+     needs at least 3px to show as two lines. */
+  --to-none-fill: var(--semantics-categories-neutral-tinted-background-color);
+  --to-none-line: var(--semantics-categories-neutral-filled-background-color);
+  --to-none-line-style: double;
+  --to-none-line-width: var(--primitives-space-3);
 }
 
 /* nldd-page is height: 100% and, with sticky-header, scrolls inside its own
@@ -130,11 +136,13 @@ body {
 .to-span--human  { --to-fill: var(--to-human-fill);  --to-line: var(--to-human-line);  --to-line-style: var(--to-human-line-style); }
 .to-span--ai     { --to-fill: var(--to-ai-fill);     --to-line: var(--to-ai-line);     --to-line-style: var(--to-ai-line-style); }
 .to-span--copied { --to-fill: var(--to-copied-fill); --to-line: var(--to-copied-line); --to-line-style: var(--to-copied-line-style); }
+/* Unknown provenance has no details to show, so it is not interactive. */
+.to-span--none   { --to-fill: var(--to-none-fill);   --to-line: var(--to-none-line);   --to-line-style: var(--to-none-line-style); --to-line-width: var(--to-none-line-width); cursor: auto; }
 
 /* Outermost visible span: background tint plus a thin rule in its line style. */
 .to-span--fill {
   background-color: var(--to-fill);
-  border-bottom: var(--primitives-border-width-regular) var(--to-line-style) var(--to-line);
+  border-bottom: var(--to-line-width, var(--primitives-border-width-regular)) var(--to-line-style) var(--to-line);
   border-radius: var(--primitives-corner-radius-xxs);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
@@ -160,15 +168,18 @@ body {
 /* ── Sidebar legend / stats ──────────────────────────────────────────────── */
 .to-swatch {
   flex: none;
-  width: var(--primitives-space-12);
-  height: var(--primitives-space-12);
+  /* Border-box so the thicker double border of "unknown" keeps every swatch the same size. */
+  box-sizing: border-box;
+  width: var(--primitives-space-16);
+  height: var(--primitives-space-16);
   border-radius: var(--primitives-corner-radius-xxs);
   background: var(--to-swatch-fill);
-  border: var(--primitives-border-width-regular) var(--to-swatch-style) var(--to-swatch-line);
+  border: var(--to-swatch-width, var(--primitives-border-width-regular)) var(--to-swatch-style) var(--to-swatch-line);
 }
 .to-swatch--human  { --to-swatch-fill: var(--to-human-fill);  --to-swatch-line: var(--to-human-line);  --to-swatch-style: var(--to-human-line-style); }
 .to-swatch--ai     { --to-swatch-fill: var(--to-ai-fill);     --to-swatch-line: var(--to-ai-line);     --to-swatch-style: var(--to-ai-line-style); }
 .to-swatch--copied { --to-swatch-fill: var(--to-copied-fill); --to-swatch-line: var(--to-copied-line); --to-swatch-style: var(--to-copied-line-style); }
+.to-swatch--none   { --to-swatch-fill: var(--to-none-fill);   --to-swatch-line: var(--to-none-line);   --to-swatch-style: var(--to-none-line-style); --to-swatch-width: var(--to-none-line-width); }
 
 .to-stats {
   list-style: none;

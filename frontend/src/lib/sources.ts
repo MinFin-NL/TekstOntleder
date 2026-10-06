@@ -15,6 +15,9 @@ export const SOURCES: Record<SourceType, SourceInfo> = {
   copied: { label: 'Gekopieerd', filterLabel: 'Gekopieerd uit een ander document', tagColor: 'lichtblauw' },
 }
 
+/** Text outside every span. Not a source, so it has no entry in SOURCES. */
+export const UNKNOWN_LABEL = 'Herkomst onbekend'
+
 const dateFormat = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'long', timeStyle: 'medium', timeZone: 'Europe/Amsterdam' })
 
 export function formatTimestamp(iso: string): string {

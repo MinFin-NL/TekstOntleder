@@ -52,6 +52,9 @@ export type SourceType = ProvenanceSpan['source_type']
 
 export const SOURCE_TYPES: readonly SourceType[] = ['human', 'ai', 'copied']
 
+/** Which markings are shown: one per source, plus `none` for text outside every span. */
+export type Visibility = Record<SourceType | 'none', boolean>
+
 export interface LJSONDocument {
   document_id: string
   format_version: string

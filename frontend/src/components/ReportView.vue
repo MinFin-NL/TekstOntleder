@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { INTEGRITY_LABELS } from '../lib/integrity'
 import { actorOf, buildReport } from '../lib/report'
-import { SOURCES, formatTimestamp } from '../lib/sources'
+import { SOURCES, UNKNOWN_LABEL, formatTimestamp } from '../lib/sources'
 import { SOURCE_TYPES, type DocumentResponse, type SourceType } from '../types/ljson'
 
 const props = defineProps<{
@@ -18,7 +18,7 @@ const pct = (n: number) => (props.total ? Math.round((n / props.total) * 100) : 
 
 const shares = computed(() => [
   ...SOURCE_TYPES.map((type) => ({ key: type, type, label: SOURCES[type].label, chars: props.stats[type] })),
-  { key: 'none', type: null, label: 'Onbekend', chars: props.stats.none },
+  { key: 'none', type: null, label: UNKNOWN_LABEL, chars: props.stats.none },
 ])
 
 const details = computed<[string, string][]>(() => [
@@ -68,7 +68,7 @@ defineExpose({ focus: () => root.value?.focus() })
             <nldd-table-row v-for="row in shares" :key="row.key">
               <nldd-cell>
                 <nldd-tag v-if="row.type" size="sm" :color="SOURCES[row.type].tagColor" :text="row.label"></nldd-tag>
-                <span v-else class="to-text--sm">{{ row.label }}</span>
+                <nldd-tag v-else size="sm" color="neutral" :text="row.label"></nldd-tag>
               </nldd-cell>
               <nldd-text-cell size="sm" horizontal-alignment="right">{{ row.chars }}</nldd-text-cell>
               <nldd-text-cell size="sm" horizontal-alignment="right">{{ pct(row.chars) }}%</nldd-text-cell>
@@ -76,6 +76,7 @@ defineExpose({ focus: () => root.value?.focus() })
           </nldd-table>
           <span class="to-text--xs to-text--subtle">
             Tekst binnen een genest fragment telt mee voor het binnenste fragment, zodat elk teken één keer wordt geteld.
+            Witruimte tussen fragmenten telt niet mee.
           </span>
         </div>
 
