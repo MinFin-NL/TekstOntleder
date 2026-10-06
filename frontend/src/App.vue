@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import ActorFilter from './components/ActorFilter.vue'
 import FilterPanel from './components/FilterPanel.vue'
 import FragmentNav from './components/FragmentNav.vue'
 import IntegrityStatus from './components/IntegrityStatus.vue'
+import ReplayPanel from './components/ReplayPanel.vue'
 import ReportView from './components/ReportView.vue'
 import SegmentList from './components/SegmentList.vue'
 import SpanPopover from './components/SpanPopover.vue'
 import UploadPanel from './components/UploadPanel.vue'
 import { actorKeys, listActors } from './lib/actors'
+import { buildReport } from './lib/report'
 import { attributionStats, buildSpanTree, segmentText, type SpanNode } from './lib/segment'
 import { spanContextKey } from './lib/spanContext'
 import type { DocumentResponse, ProvenanceSpan, SourceType, Visibility } from './types/ljson'
@@ -126,8 +128,26 @@ function isSpanShown(span: ProvenanceSpan): boolean {
   return visible.value[span.source_type] && !actorKeys(span).some((key) => hiddenActors.value[key])
 }
 
-// A span that is filtered out can no longer anchor its popover.
-const shown = computed(() => (active.value && isSpanShown(active.value.node.span) ? active.value : null))
+// ── Replay ── step k shows the k oldest spans (see buildReport().timeline); null when off.
+const replayStep = ref<number | null>(null)
+const timeline = computed(() => (load.value.status === 'ready' ? buildReport(load.value.doc).timeline : []))
+const existing = computed(() =>
+  replayStep.value === null ? null : new Set(timeline.value.slice(0, replayStep.value).map((f) => f.number - 1)),
+)
+const currentIndex = computed(() => (replayStep.value === null ? null : timeline.value[replayStep.value - 1].number - 1))
+// Node ids are the span's index in provenance_spans, with a suffix for the pieces of a split span.
+const spanIndex = (node: SpanNode) => Number.parseInt(node.id, 10)
+const isFuture = (node: SpanNode) => existing.value !== null && !existing.value.has(spanIndex(node))
+const isNodeShown = (node: SpanNode) => isSpanShown(node.span) && !isFuture(node)
+
+watch(currentIndex, async (index) => {
+  if (index === null) return
+  await nextTick()
+  documentEl.value?.querySelector(`#span-${index}`)?.scrollIntoView({ block: 'nearest' })
+})
+
+// A span that is filtered out, or not yet written in a replay, can no longer anchor its popover.
+const shown = computed(() => (active.value && isNodeShown(active.value.node) ? active.value : null))
 
 let openTimer: number | undefined
 let closeTimer: number | undefined
@@ -177,7 +197,9 @@ function onClose() {
 
 provide(spanContextKey, {
   visible,
-  isShown: (node) => isSpanShown(node.span),
+  isShown: isNodeShown,
+  isFuture,
+  isCurrent: (node) => currentIndex.value === spanIndex(node),
   activeId: computed(() => shown.value?.node.id ?? null),
   onHover,
   onLeave,
@@ -197,6 +219,7 @@ function onUploaded(doc: DocumentResponse, fileName: string) {
   controller.abort()
   onClose()
   hiddenActors.value = {}
+  replayStep.value = null
   load.value = { status: 'ready', doc, fileName }
 }
 
@@ -244,6 +267,7 @@ function onOnly(type: SourceType | null) {
 
       <aside v-show="view === 'document'" class="to-sidebar" aria-label="Weergave-instellingen">
         <FilterPanel :visible="visible" :stats="stats" :total="total" @toggle="onToggle" @only="onOnly" />
+        <ReplayPanel v-model:step="replayStep" :steps="timeline" />
         <ActorFilter
           :people="actors.people"
           :models="actors.models"

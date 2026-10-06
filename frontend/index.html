@@ -2,7 +2,11 @@
 <html lang="nl" data-scheme="light">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Rijksoverheid emblem from NLDD (exported as @nldd/design-system/favicon.svg and
+         /touch-icon.png). Vite does not resolve package names in HTML, but it does bundle a
+         relative file path, so the icons follow the pinned NLDD version. -->
+    <link rel="icon" type="image/svg+xml" href="./node_modules/@nldd/design-system/dist/favicon.svg" />
+    <link rel="apple-touch-icon" href="./node_modules/@nldd/design-system/dist/touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TekstOntleder</title>
   </head>

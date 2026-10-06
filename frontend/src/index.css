@@ -168,8 +168,14 @@ body {
   outline: var(--semantics-focus-ring-outline);
   outline-offset: var(--semantics-focus-ring-outline-offset);
 }
-.to-span--fill.is-active { box-shadow: inset 0 calc(-1 * var(--primitives-space-3)) 0 var(--to-line); }
-.to-span--underline.is-active { text-decoration-thickness: var(--primitives-space-4); }
+.to-span--fill.is-active,
+.to-span--fill.is-current { box-shadow: inset 0 calc(-1 * var(--primitives-space-3)) 0 var(--to-line); }
+.to-span--underline.is-active,
+.to-span--underline.is-current { text-decoration-thickness: var(--primitives-space-4); }
+
+/* Replay: text written after the current step. Slanted as well as grey, so it
+   does not rest on colour alone; a hidden label says it to screen readers. */
+.to-future { color: var(--semantics-content-secondary-color); font-style: italic; }
 
 /* ── Sidebar legend / stats ──────────────────────────────────────────────── */
 .to-swatch {

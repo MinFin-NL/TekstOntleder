@@ -10,6 +10,8 @@ const props = defineProps<{
   insideHighlight: boolean
   /** True below any span, shown or filtered out: its gaps belong to that span, not to "unknown". */
   owned?: boolean
+  /** True inside a span that a replay has not reached yet; only the outermost one is labelled. */
+  inFuture?: boolean
 }>()
 
 const ctx = inject(spanContextKey)!
@@ -30,7 +32,7 @@ function classes(node: SpanNode) {
     'to-span',
     `to-span--${node.span.source_type}`,
     `to-span--${style}`,
-    { 'is-active': ctx.activeId.value === node.id },
+    { 'is-active': ctx.activeId.value === node.id, 'is-current': ctx.isCurrent(node) },
   ]
 }
 
@@ -80,10 +82,16 @@ function onKey(node: SpanNode, e: KeyboardEvent) {
       @keydown.space="onKey(seg.node, $event)"
     >
       <span class="to-visually-hidden">[{{ SOURCES[seg.node.span.source_type].label }}: </span>
-      <SegmentList :segments="seg.children" :inside-highlight="true" owned />
+      <SegmentList :segments="seg.children" :inside-highlight="true" owned :in-future="inFuture" />
       <span class="to-visually-hidden">]</span>
     </mark>
+    <!-- Not written yet at this replay step: the final text, greyed and slanted, without a mark. -->
+    <span v-else-if="ctx.isFuture(seg.node) && !inFuture" class="to-future">
+      <span class="to-visually-hidden">[Nog niet geschreven: </span>
+      <SegmentList :segments="seg.children" :inside-highlight="insideHighlight" owned in-future />
+      <span class="to-visually-hidden">]</span>
+    </span>
     <!-- A source that is filtered out keeps its text but loses its mark and tooltip. -->
-    <SegmentList v-else :segments="seg.children" :inside-highlight="insideHighlight" owned />
+    <SegmentList v-else :segments="seg.children" :inside-highlight="insideHighlight" owned :in-future="inFuture" />
   </template>
 </template>
