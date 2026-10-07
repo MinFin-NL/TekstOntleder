@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.env.local
+__pycache__
+*.pyc
+.venv
+.git
+.DS_Store
+.idea
+.pytest_cache
+claude.md
+.claude

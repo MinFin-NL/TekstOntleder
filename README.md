@@ -32,3 +32,17 @@ cd frontend && npm test && npm run build
   onderstreping in hun eigen kleur en lijnstijl (nooit gestapelde achtergronden).
 - `frontend/src/components/SpanPopover.vue` — één gedeelde `nldd-popover` met de
   metadata; aanwijzen opent hem tijdelijk, klikken of Enter zet hem vast.
+
+## Deployment (zelfde omgeving als invulhulp en regiekamer)
+
+`azure-pipelines.yml` bouwt `tekstontleder-backend` en `tekstontleder-frontend` naar de ACR
+van `rg-invulhulp-inno-d` en rolt twee Container Apps uit in `cae-invulhulp-inno-d`:
+
+- `ca-tekstontleder-backend-inno-d` — intern, poort 8000. Geen opslag en geen model nodig.
+- `ca-tekstontleder-frontend-inno-d` — extern, nginx proxyt `/api` naar de backend, achter
+  dezelfde IP-allowlist als invulhulp (variabelengroep `invulhulp-secrets`).
+
+Eenmalig: geef de pipeline toegang tot de variabelengroep `invulhulp-secrets`, registreer
+`azure-pipelines.yml` in Azure DevOps en draai hem op `main`.
+
+Lokaal de productie-images draaien: `docker compose up --build` → http://localhost:8080.

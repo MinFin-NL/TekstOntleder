@@ -1,0 +1,10 @@
+FROM python:3.13-slim
+RUN pip install --no-cache-dir uv
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
+# main.py resolves the model and the example documents from its parent's parent (/app).
+COPY LJSONDocument.py example.ljson example_nested.ljson ./
+COPY backend/*.py ./backend/
+EXPOSE 8000
+CMD ["uv", "run", "--no-dev", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

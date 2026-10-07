@@ -1,0 +1,223 @@
+# Same shape as regiekamer's pipeline, and deployed next to it: both images go
+# into the ACR of invulhulp's resource group and roll out as Container Apps in
+# invulhulp's Container Apps environment (backend internal, frontend external
+# behind the same IP allowlist). TekstOntleder needs no model and stores
+# nothing, so there is no OpenAI variable group and no storage mount.
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - README.md
+
+pool:
+  name: alz-p-mgmt-we-ccoe-pool
+
+variables:
+  # invulhulp's variable group: AZURE_SERVICE_CONNECTION and the firewall IPs
+  # (ALLOWED_IP_1..ALLOWED_IP_4), so all frontends share one allowlist.
+  - group: invulhulp-secrets
+  - name: BACKEND_IMAGE
+    value: tekstontleder-backend
+  - name: FRONTEND_IMAGE
+    value: tekstontleder-frontend
+  - name: RESOURCE_GROUP
+    value: rg-invulhulp-inno-d
+  - name: CONTAINER_APP_ENV
+    value: cae-invulhulp-inno-d
+  - name: BACKEND_APP
+    value: ca-tekstontleder-backend-inno-d
+  - name: FRONTEND_APP
+    value: ca-tekstontleder-frontend-inno-d
+
+stages:
+  - stage: Build
+    displayName: Build and push images
+    jobs:
+      - job: Build
+        displayName: Docker build and push to ACR
+        steps:
+          - task: AzureCLI@2
+            displayName: Build and push backend
+            env:
+              IMAGE_TAG: $(Build.SourceVersion)
+              BACKEND_IMAGE: $(BACKEND_IMAGE)
+              RESOURCE_GROUP: $(RESOURCE_GROUP)
+            inputs:
+              azureSubscription: $(AZURE_SERVICE_CONNECTION)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                ACR_LOGIN_SERVER=$(az acr list --resource-group "$RESOURCE_GROUP" --query "[0].loginServer" -o tsv)
+                az acr login --name "${ACR_LOGIN_SERVER%%.*}"
+                docker build -f Dockerfile.backend \
+                  -t "$ACR_LOGIN_SERVER/$BACKEND_IMAGE:$IMAGE_TAG" \
+                  -t "$ACR_LOGIN_SERVER/$BACKEND_IMAGE:latest" .
+                docker push "$ACR_LOGIN_SERVER/$BACKEND_IMAGE:$IMAGE_TAG"
+                docker push "$ACR_LOGIN_SERVER/$BACKEND_IMAGE:latest"
+
+          - task: AzureCLI@2
+            displayName: Build and push frontend
+            env:
+              IMAGE_TAG: $(Build.SourceVersion)
+              FRONTEND_IMAGE: $(FRONTEND_IMAGE)
+              RESOURCE_GROUP: $(RESOURCE_GROUP)
+            inputs:
+              azureSubscription: $(AZURE_SERVICE_CONNECTION)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                ACR_LOGIN_SERVER=$(az acr list --resource-group "$RESOURCE_GROUP" --query "[0].loginServer" -o tsv)
+                az acr login --name "${ACR_LOGIN_SERVER%%.*}"
+                docker build -f Dockerfile.frontend \
+                  -t "$ACR_LOGIN_SERVER/$FRONTEND_IMAGE:$IMAGE_TAG" \
+                  -t "$ACR_LOGIN_SERVER/$FRONTEND_IMAGE:latest" .
+                docker push "$ACR_LOGIN_SERVER/$FRONTEND_IMAGE:$IMAGE_TAG"
+                docker push "$ACR_LOGIN_SERVER/$FRONTEND_IMAGE:latest"
+
+  - stage: Deploy
+    displayName: Deploy to Container Apps
+    dependsOn: Build
+    # Only main deploys; PR runs build images but never touch the apps.
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: Deploy
+        displayName: Deploy backend and frontend
+        steps:
+          - task: AzureCLI@2
+            displayName: Deploy backend
+            env:
+              IMAGE_TAG: $(Build.SourceVersion)
+              BACKEND_IMAGE: $(BACKEND_IMAGE)
+              BACKEND_APP: $(BACKEND_APP)
+              RESOURCE_GROUP: $(RESOURCE_GROUP)
+              CONTAINER_APP_ENV: $(CONTAINER_APP_ENV)
+            inputs:
+              azureSubscription: $(AZURE_SERVICE_CONNECTION)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                ACR_LOGIN_SERVER=$(az acr list --resource-group "$RESOURCE_GROUP" --query "[0].loginServer" -o tsv)
+                ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
+                ACR_USER=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)
+                ACR_PASS=$(az acr credential show --name "$ACR_NAME" --query "passwords[0].value" -o tsv)
+
+                if az containerapp show --name "$BACKEND_APP" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+                  az containerapp update \
+                    --name "$BACKEND_APP" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --image "$ACR_LOGIN_SERVER/$BACKEND_IMAGE:$IMAGE_TAG" \
+                    --min-replicas 1 \
+                    --output none
+                else
+                  az containerapp create \
+                    --name "$BACKEND_APP" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --environment "$CONTAINER_APP_ENV" \
+                    --image "$ACR_LOGIN_SERVER/$BACKEND_IMAGE:$IMAGE_TAG" \
+                    --registry-server "$ACR_LOGIN_SERVER" \
+                    --registry-username "$ACR_USER" \
+                    --registry-password "$ACR_PASS" \
+                    --ingress internal \
+                    --target-port 8000 \
+                    --cpu 0.25 --memory 0.5Gi \
+                    --min-replicas 1 --max-replicas 2 \
+                    --output none
+                fi
+
+          - task: AzureCLI@2
+            displayName: Deploy frontend
+            env:
+              IMAGE_TAG: $(Build.SourceVersion)
+              FRONTEND_IMAGE: $(FRONTEND_IMAGE)
+              FRONTEND_APP: $(FRONTEND_APP)
+              BACKEND_APP: $(BACKEND_APP)
+              RESOURCE_GROUP: $(RESOURCE_GROUP)
+              CONTAINER_APP_ENV: $(CONTAINER_APP_ENV)
+            inputs:
+              azureSubscription: $(AZURE_SERVICE_CONNECTION)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                ACR_LOGIN_SERVER=$(az acr list --resource-group "$RESOURCE_GROUP" --query "[0].loginServer" -o tsv)
+                ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
+                ACR_USER=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)
+                ACR_PASS=$(az acr credential show --name "$ACR_NAME" --query "passwords[0].value" -o tsv)
+
+                BACKEND_FQDN=$(az containerapp show \
+                  --name "$BACKEND_APP" \
+                  --resource-group "$RESOURCE_GROUP" \
+                  --query "properties.configuration.ingress.fqdn" -o tsv)
+                BACKEND_URL="https://${BACKEND_FQDN}"
+
+                if az containerapp show --name "$FRONTEND_APP" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+                  az containerapp update \
+                    --name "$FRONTEND_APP" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --image "$ACR_LOGIN_SERVER/$FRONTEND_IMAGE:$IMAGE_TAG" \
+                    --min-replicas 1 \
+                    --set-env-vars "BACKEND_URL=${BACKEND_URL}" \
+                    --output none
+                else
+                  az containerapp create \
+                    --name "$FRONTEND_APP" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --environment "$CONTAINER_APP_ENV" \
+                    --image "$ACR_LOGIN_SERVER/$FRONTEND_IMAGE:$IMAGE_TAG" \
+                    --registry-server "$ACR_LOGIN_SERVER" \
+                    --registry-username "$ACR_USER" \
+                    --registry-password "$ACR_PASS" \
+                    --ingress external \
+                    --target-port 80 \
+                    --env-vars "BACKEND_URL=${BACKEND_URL}" \
+                    --cpu 0.25 --memory 0.5Gi \
+                    --min-replicas 1 --max-replicas 2 \
+                    --output none
+                fi
+
+          - task: AzureCLI@2
+            displayName: Apply firewall rules to frontend
+            env:
+              FRONTEND_APP: $(FRONTEND_APP)
+              RESOURCE_GROUP: $(RESOURCE_GROUP)
+              ALLOWED_IP_1: $(ALLOWED_IP_1)
+              ALLOWED_IP_2: $(ALLOWED_IP_2)
+              ALLOWED_IP_3: $(ALLOWED_IP_3)
+              ALLOWED_IP_4: $(ALLOWED_IP_4)
+            inputs:
+              azureSubscription: $(AZURE_SERVICE_CONNECTION)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                # Same rules and IPs as invulhulp's frontend. No login in this
+                # demo: the IP allowlist is the only gate.
+                az containerapp ingress access-restriction set \
+                  --name "$FRONTEND_APP" \
+                  --resource-group "$RESOURCE_GROUP" \
+                  --rule-name "DWR Next werkplekken" \
+                  --ip-address "$ALLOWED_IP_1" \
+                  --action Allow
+                az containerapp ingress access-restriction set \
+                  --name "$FRONTEND_APP" \
+                  --resource-group "$RESOURCE_GROUP" \
+                  --rule-name "ITS" \
+                  --ip-address "$ALLOWED_IP_2" \
+                  --action Allow
+                az containerapp ingress access-restriction set \
+                  --name "$FRONTEND_APP" \
+                  --resource-group "$RESOURCE_GROUP" \
+                  --rule-name "Allowed range 3" \
+                  --ip-address "$ALLOWED_IP_3" \
+                  --action Allow
+                az containerapp ingress access-restriction set \
+                  --name "$FRONTEND_APP" \
+                  --resource-group "$RESOURCE_GROUP" \
+                  --rule-name "Allowed range 4" \
+                  --ip-address "$ALLOWED_IP_4" \
+                  --action Allow

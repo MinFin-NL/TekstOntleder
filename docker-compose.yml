@@ -1,0 +1,17 @@
+# Local run of the production images: http://localhost:8080.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
