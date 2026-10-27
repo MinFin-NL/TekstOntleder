@@ -55,12 +55,21 @@ export const SOURCE_TYPES: readonly SourceType[] = ['human', 'ai', 'copied']
 /** Which markings are shown: one per source, plus `none` for text outside every span. */
 export type Visibility = Record<SourceType | 'none', boolean>
 
+/** What a stretch of text is in the layout (StructureBlock in LJSONDocument.py). */
+export type BlockRole = 'title' | 'subtitle' | 'section' | 'question' | 'answer'
+
+export interface StructureBlock extends BaseSpan {
+  role: BlockRole
+}
+
 export interface LJSONDocument {
   document_id: string
   format_version: string
   document_hash: string
   text: string
   provenance_spans: ProvenanceSpan[]
+  /** Optional: without it the text is one run, as in plain LJSON 1.0. */
+  structure?: StructureBlock[]
 }
 
 /** Mirrors backend/integrity.py: `document_hash` checked as SHA-256 over the UTF-8 text. */

@@ -32,6 +32,11 @@ cd frontend && npm test && npm run build
   onderstreping in hun eigen kleur en lijnstijl (nooit gestapelde achtergronden).
 - `frontend/src/components/SpanPopover.vue` — één gedeelde `nldd-popover` met de
   metadata; aanwijzen opent hem tijdelijk, klikken of Enter zet hem vast.
+- `frontend/src/lib/structure.ts` + `components/StructuredDocument.vue` — als een document
+  het optionele veld `structure` heeft (blokken met `role`: `title`, `subtitle`, `section`,
+  `question`, `answer`), wordt de tekst als koppen, vragen en antwoorden opgemaakt in plaats
+  van als lopende tekst. De herkomstmarkering werkt binnen elk blok hetzelfde. De invulhulp
+  levert dit veld mee in zijn LJSON-export.
 
 ## Deployment (zelfde omgeving als invulhulp en regiekamer)
 

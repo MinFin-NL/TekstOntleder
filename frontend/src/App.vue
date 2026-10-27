@@ -8,11 +8,13 @@ import ReplayPanel from './components/ReplayPanel.vue'
 import ReportView from './components/ReportView.vue'
 import SegmentList from './components/SegmentList.vue'
 import SpanPopover from './components/SpanPopover.vue'
-import UploadPanel from './components/UploadPanel.vue'
+import StructuredDocument from './components/StructuredDocument.vue'
+import UploadDialog from './components/UploadDialog.vue'
 import { actorKeys, listActors } from './lib/actors'
 import { buildReport } from './lib/report'
 import { attributionStats, buildSpanTree, segmentText, type SpanNode } from './lib/segment'
 import { spanContextKey } from './lib/spanContext'
+import { layoutBlocks } from './lib/structure'
 import type { DocumentResponse, ProvenanceSpan, SourceType, Visibility } from './types/ljson'
 
 const HOVER_OPEN_MS = 150
@@ -51,18 +53,27 @@ onMounted(async () => {
   }
 })
 
-const segments = computed(() => {
+const spanTree = computed(() => {
   if (load.value.status !== 'ready') return []
   const { text, provenance_spans } = load.value.doc
-  return segmentText(text, buildSpanTree(provenance_spans, text))
+  return buildSpanTree(provenance_spans, text)
 })
+const segments = computed(() => (load.value.status === 'ready' ? segmentText(load.value.doc.text, spanTree.value) : []))
 const stats = computed(() => attributionStats(segments.value))
+
+/** Headings, questions and answers when the document says which is which; null for running text. */
+const blocks = computed(() => {
+  if (load.value.status !== 'ready' || !load.value.doc.structure?.length) return null
+  return layoutBlocks(load.value.doc.text, spanTree.value, load.value.doc.structure)
+})
 
 /** Every rendered span by id, to resolve a `mark#span-<id>` back to its node. */
 const nodesById = computed(() => {
   const map = new Map<string, SpanNode>()
   const walk = (nodes: readonly SpanNode[]) => nodes.forEach((n) => (map.set(n.id, n), walk(n.children)))
-  for (const seg of segments.value) if (seg.kind === 'span') walk([seg.node])
+  // Blocks clip spans that cross them, so their pieces are what is rendered.
+  const rendered = blocks.value ? blocks.value.flatMap((b) => b.segments) : segments.value
+  for (const seg of rendered) if (seg.kind === 'span') walk([seg.node])
   return map
 })
 
@@ -223,12 +234,44 @@ function onUploaded(doc: DocumentResponse, fileName: string) {
   load.value = { status: 'ready', doc, fileName }
 }
 
+// ── Opening a document ── via the toolbar button, or by dropping a file on the document.
+const uploadOpen = ref(false)
+const uploadDialog = ref<InstanceType<typeof UploadDialog> | null>(null)
+const dragging = ref(false)
+// dragenter/dragleave also fire for every child crossed, so count them.
+let dragDepth = 0
+
+const isFileDrag = (e: DragEvent) => e.dataTransfer?.types.includes('Files') ?? false
+
+function onDragEnter(e: DragEvent) {
+  if (!isFileDrag(e)) return
+  dragDepth++
+  dragging.value = true
+}
+
+function onDragLeave(e: DragEvent) {
+  if (!isFileDrag(e)) return
+  dragDepth = Math.max(0, dragDepth - 1)
+  if (!dragDepth) dragging.value = false
+}
+
+function onDrop(e: DragEvent) {
+  dragDepth = 0
+  dragging.value = false
+  const file = e.dataTransfer?.files[0]
+  if (!file) return
+  // The dialog shows progress and any validation errors, and closes itself on success.
+  onClose()
+  uploadOpen.value = true
+  uploadDialog.value?.upload(file)
+}
+
 // The report replaces the document view in place, so an uploaded document survives the switch.
 const view = ref<'document' | 'report'>('document')
 const reportView = ref<InstanceType<typeof ReportView> | null>(null)
-const reportButton = ref<HTMLElement | null>(null)
 
 async function openReport() {
+  if (load.value.status !== 'ready') return
   onClose()
   view.value = 'report'
   await nextTick()
@@ -239,10 +282,9 @@ function printReport() {
   window.print()
 }
 
-async function closeReport() {
+// Focus stays on the menu item that was chosen, as with any navigation.
+function showDocument() {
   view.value = 'document'
-  await nextTick()
-  reportButton.value?.focus()
 }
 
 function onOnly(type: SourceType | null) {
@@ -251,8 +293,35 @@ function onOnly(type: SourceType | null) {
 </script>
 
 <template>
-  <nldd-page background="tinted" sticky-header>
-    <nldd-top-navigation-bar slot="header" website-title="TekstOntleder"></nldd-top-navigation-bar>
+  <!-- The bar sits above the page, not in its header slot: nldd-page draws a
+       sticky header at 95% opacity, so text scrolled under it shows through.
+       As in the invulhulp, the header is solid and the page scrolls below it. -->
+  <div class="to-app">
+  <header class="to-header">
+    <!-- Beta notice, as in the invulhulp: NLDD's status bar goes at the very
+         top, above the bar. It carries one action, so the whole bar is the
+         mailto link. -->
+    <nldd-status-bar
+      variant="warning"
+      text="Dit is een bètaversie van de TekstOntleder. Vragen of feedback? innovatiemanagamentfinancien@minfin.nl"
+      href="mailto:innovatiemanagamentfinancien@minfin.nl"
+    ></nldd-status-bar>
+    <nldd-top-navigation-bar logo-title="Ministerie van Financiën" website-title="TekstOntleder" logo-href="?" website-href="?">
+      <!-- The two views of the open document. The report needs a document,
+           so it stays disabled while one is loading or failed to load. -->
+      <nldd-menu-bar slot="global" accessible-label="Hoofdnavigatie">
+        <nldd-menu-bar-item text="Document" icon="file" :current="view === 'document'" @select="showDocument"></nldd-menu-bar-item>
+        <nldd-menu-bar-item
+          text="Herkomstrapport"
+          icon="file-text"
+          :current="view === 'report'"
+          :disabled="load.status !== 'ready'"
+          @select="openReport"
+        ></nldd-menu-bar-item>
+      </nldd-menu-bar>
+    </nldd-top-navigation-bar>
+  </header>
+  <nldd-page background="tinted">
 
     <div :class="['to-layout', { 'to-layout--report': view === 'report' }]">
       <div class="to-intro">
@@ -261,7 +330,7 @@ function onOnly(type: SourceType | null) {
           heading-level="1"
           overline="Herkomst van tekst"
           text="Documentweergave"
-          supporting-text="Zie per fragment of het door een mens is geschreven, door AI is gegenereerd of uit een ander document is gekopieerd. Wijs een gemarkeerd fragment aan of activeer het voor de details."
+          supporting-text="Zie per fragment of het door een mens is geschreven, door AI is gegenereerd of uit een ander document is gekopieerd. Wijs een gemarkeerd fragment aan of activeer het voor de details. Met ‘Eigen document openen’ bekijk je je eigen LJSON-bestand."
         ></nldd-title>
       </div>
 
@@ -275,7 +344,6 @@ function onOnly(type: SourceType | null) {
           @toggle="onActorToggle"
           @reset="hiddenActors = {}"
         />
-        <UploadPanel @loaded="onUploaded" />
         <p class="to-text--sm to-variant-link">
           <a v-if="load.status === 'ready' && load.fileName" href="?">Terug naar het voorbeeld</a>
           <a v-else-if="variant === 'nested'" href="?">Terug naar het standaardvoorbeeld</a>
@@ -283,7 +351,19 @@ function onOnly(type: SourceType | null) {
         </p>
       </aside>
 
-      <main class="to-main">
+      <main
+        :class="['to-main', { 'to-main--drop': dragging && view === 'document' }]"
+        @dragenter="view === 'document' && onDragEnter($event)"
+        @dragleave="view === 'document' && onDragLeave($event)"
+        @dragover.prevent
+        @drop.prevent="view === 'document' && onDrop($event)"
+      >
+        <div class="to-toolbar">
+          <p v-if="dragging" class="to-drop-hint to-text--sm" role="status">Laat het bestand los om het te openen</p>
+          <!-- Switching views is the menu bar's job; the toolbar keeps each view's actions. -->
+          <nldd-button v-if="view === 'document'" variant="primary" size="sm" start-icon="upload" text="Eigen document openen" @click="uploadOpen = true"></nldd-button>
+          <nldd-button v-else variant="primary" size="sm" start-icon="printer" text="Afdrukken of opslaan als pdf" @click="printReport"></nldd-button>
+        </div>
         <nldd-activity-indicator v-if="load.status === 'loading'" text="Document wordt geladen"></nldd-activity-indicator>
         <nldd-banner
           v-else-if="load.status === 'error'"
@@ -292,39 +372,27 @@ function onOnly(type: SourceType | null) {
           :supporting-text="load.message"
         ></nldd-banner>
         <template v-else>
-          <div class="to-toolbar">
-            <nldd-button
-              v-if="view === 'document'"
-              ref="reportButton"
-              variant="secondary"
-              size="sm"
-              start-icon="file-text"
-              text="Herkomstrapport"
-              @click="openReport"
-            ></nldd-button>
-            <template v-else>
-              <nldd-button variant="secondary" size="sm" start-icon="arrow-left" text="Terug naar het document" @click="closeReport"></nldd-button>
-              <nldd-button variant="primary" size="sm" start-icon="printer" text="Afdrukken of opslaan als pdf" @click="printReport"></nldd-button>
-            </template>
-          </div>
           <nldd-card v-if="view === 'document'" accessible-label="Document">
             <nldd-container padding="24" gap="16">
               <nldd-title
                 size="4"
                 heading-level="2"
                 :text="load.doc.document_id"
-                :supporting-text="`${load.fileName ? `${load.fileName} · ` : ''}${load.doc.format_version} · ${load.doc.provenance_spans.length} fragmenten`"
+                :supporting-text="`${load.fileName ?? 'Voorbeelddocument'} · ${load.doc.format_version} · ${load.doc.provenance_spans.length} fragmenten`"
               ></nldd-title>
               <IntegrityStatus :integrity="load.doc.integrity" :document-hash="load.doc.document_hash" />
               <nldd-divider></nldd-divider>
               <FragmentNav ref="fragmentNav" :root="documentEl" :active-id="shown?.node.id ?? null" @jump="onJump" />
-              <p ref="documentEl" class="to-document" @keydown="onFragmentKey"><SegmentList :segments="segments" :inside-highlight="false" /></p>
+              <div v-if="blocks" ref="documentEl" class="to-document to-document--structured" @keydown="onFragmentKey"><StructuredDocument :blocks="blocks" /></div>
+              <p v-else ref="documentEl" class="to-document" @keydown="onFragmentKey"><SegmentList :segments="segments" :inside-highlight="false" /></p>
             </nldd-container>
           </nldd-card>
           <ReportView v-else ref="reportView" :doc="load.doc" :file-name="load.fileName" :stats="stats" :total="total" />
         </template>
       </main>
     </div>
+
+    <UploadDialog ref="uploadDialog" v-model:open="uploadOpen" @loaded="onUploaded" />
 
     <SpanPopover
       :node="shown?.node ?? null"
@@ -335,4 +403,5 @@ function onOnly(type: SourceType | null) {
       @pointerleave="active?.pinned || onLeave()"
     />
   </nldd-page>
+  </div>
 </template>

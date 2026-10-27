@@ -51,6 +51,33 @@ def test_invalid_layouts(ranges, message):
         LJSONDocument.model_validate(doc("abcdefghij", *ranges))
 
 
+def with_blocks(*blocks: tuple[int, int, str]) -> dict:
+    return {**doc("abcdefghij"), "structure": [{"start_idx": s, "end_idx": e, "role": r} for s, e, r in blocks]}
+
+
+def test_structure_is_optional():
+    assert LJSONDocument.model_validate(doc("abcdefghij")).structure == []
+
+
+def test_valid_structure():
+    parsed = LJSONDocument.model_validate(with_blocks((5, 10, "answer"), (0, 4, "question")))
+    assert [b.role for b in parsed.structure] == ["answer", "question"]
+
+
+@pytest.mark.parametrize(
+    ("blocks", "message"),
+    [
+        ([(0, 11, "answer")], "exceeds text length"),
+        ([(0, 5, "question"), (4, 8, "answer")], "overlaps block"),
+        ([(0, 10, "section"), (2, 4, "question")], "overlaps block"),
+        ([(0, 3, "paragraph")], "Input should be"),
+    ],
+)
+def test_invalid_structure(blocks, message):
+    with pytest.raises(ValidationError, match=message):
+        LJSONDocument.model_validate(with_blocks(*blocks))
+
+
 def test_indexes_count_code_points():
     # Five code points, seven UTF-16 units: the last character ends at index 5.
     text = "a😀b𝔸c"

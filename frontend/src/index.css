@@ -4,19 +4,24 @@
 @import '@nldd/design-system/styles';
 
 /* ── Source colours ──────────────────────────────────────────────────────── */
-/* Rijkshuisstijl categories: groen = mens, paars = AI, lichtblauw = gekopieerd.
-   Tinted backgrounds keep body text well above 4.5:1; the filled tone is the
-   strong line colour for underlines. Each source also has its own line style
-   so the distinction never rests on colour alone (WCAG 1.4.1). */
+/* NLDD theme colours, picked to sit far apart on the colour wheel: geel = mens,
+   violet = AI, lintblauw (the NLDD standard blue) = gekopieerd. The plain tints
+   (step 50) are so pale that sources blurred together, so violet and lintblauw
+   use the next step (the "highlight" tint, 100). Geel already carries far more
+   colour at 50 and would drown the others at 100, so it stays one step lighter;
+   that gives the three about the same weight. Body text stays above 13:1 on
+   every fill, the 500 line tone above 3:1 against its fill (WCAG 1.4.11).
+   Each source also has its own line style, so the distinction never rests on
+   colour alone (WCAG 1.4.1). */
 :root {
-  --to-human-fill: var(--semantics-categories-groen-tinted-background-color);
-  --to-human-line: var(--semantics-categories-groen-filled-background-color);
+  --to-human-fill: var(--semantics-categories-geel-tinted-background-color);
+  --to-human-line: var(--semantics-categories-geel-filled-background-color);
   --to-human-line-style: solid;
-  --to-ai-fill: var(--semantics-categories-paars-tinted-background-color);
-  --to-ai-line: var(--semantics-categories-paars-filled-background-color);
+  --to-ai-fill: var(--semantics-categories-violet-tinted-highlight-border-color);
+  --to-ai-line: var(--semantics-categories-violet-filled-background-color);
   --to-ai-line-style: dotted;
-  --to-copied-fill: var(--semantics-categories-lichtblauw-tinted-background-color);
-  --to-copied-line: var(--semantics-categories-lichtblauw-filled-background-color);
+  --to-copied-fill: var(--semantics-categories-lintblauw-tinted-highlight-border-color);
+  --to-copied-line: var(--semantics-categories-lintblauw-filled-background-color);
   --to-copied-line-style: dashed;
   /* Text outside every span: not a source, so a neutral tone. A double line
      needs at least 3px to show as two lines. */
@@ -26,15 +31,24 @@
   --to-none-line-width: var(--primitives-space-3);
 }
 
-/* nldd-page is height: 100% and, with sticky-header, scrolls inside its own
-   .page__scroll behind overflow: hidden. Without a definite height up the
-   chain the page grows with its content, the inner scroller never overflows
-   and wheel/trackpad scrolling does nothing. */
+/* nldd-page is the scroll container, below the solid .to-header. Without a
+   definite height up the chain the page grows with its content, never
+   overflows, and wheel/trackpad scrolling does nothing. */
 html,
 body,
 #app {
   height: 100%;
 }
+
+/* Solid header above the page (see App.vue); the page fills the rest and is
+   the scroll container, so the header never scrolls away or turns translucent. */
+.to-app { display: flex; flex-direction: column; height: 100%; }
+.to-header {
+  flex: none;
+  background-color: var(--semantics-surfaces-base-background-color);
+  border-block-end: var(--primitives-border-width-regular) solid var(--semantics-dividers-color);
+}
+.to-app > nldd-page { flex: 1 1 auto; min-height: 0; height: auto; }
 
 body {
   margin: 0;
@@ -62,6 +76,13 @@ body {
 .to-sidebar { grid-area: side; display: flex; flex-direction: column; gap: var(--primitives-space-16); }
 .to-main { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: var(--primitives-space-16); }
 .to-toolbar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--primitives-space-8); }
+/* A file dragged over the document: a dashed outline marks where it can be dropped. */
+.to-main--drop {
+  outline: var(--primitives-space-2) dashed var(--semantics-content-accent-color);
+  outline-offset: var(--primitives-space-8);
+  border-radius: var(--primitives-corner-radius-md);
+}
+.to-drop-hint { margin: 0 auto 0 0; align-self: center; color: var(--semantics-content-accent-color); }
 .to-fragment-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--primitives-space-8); }
 @media (hover: none) and (pointer: coarse) {
   .to-shortcut-hint { display: none; }
@@ -130,6 +151,20 @@ body {
   font-size: var(--primitives-font-size-100);
   line-height: 2;
 }
+
+/* A document with structure blocks: headings, questions and answers each get
+   their own element. The newlines between blocks are dropped (the layout
+   replaces them); inside an answer they still break lines. */
+.to-document--structured { display: flex; flex-direction: column; gap: var(--primitives-space-4); }
+.to-block { margin: 0; }
+.to-block--subtitle { color: var(--semantics-content-secondary-color); }
+.to-block--section { margin-top: var(--primitives-space-24); }
+.to-block--question {
+  margin-top: var(--primitives-space-16);
+  font-size: var(--primitives-font-size-100);
+  font-weight: var(--primitives-font-weight-body-semi-bold);
+}
+.to-block--answer { white-space: pre-line; }
 
 .to-span {
   color: inherit;
@@ -239,8 +274,10 @@ body {
 @media print {
   html,
   body,
-  #app { height: auto; }
+  #app,
+  .to-app { height: auto; }
   nldd-page { height: auto; overflow: visible; }
+  .to-header { display: none; }
 
   .to-intro,
   .to-sidebar,
