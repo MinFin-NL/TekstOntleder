@@ -10,9 +10,10 @@ export interface SourceInfo {
 }
 
 export const SOURCES: Record<SourceType, SourceInfo> = {
-  human: { label: 'Mens', filterLabel: 'Door een mens geschreven', tagColor: 'groen' },
-  ai: { label: 'AI', filterLabel: 'Door AI gegenereerd', tagColor: 'paars' },
-  copied: { label: 'Gekopieerd', filterLabel: 'Gekopieerd uit een ander document', tagColor: 'lichtblauw' },
+  // Same hues as the highlights (--to-*-fill in index.css).
+  human: { label: 'Mens', filterLabel: 'Door een mens geschreven', tagColor: 'geel' },
+  ai: { label: 'AI', filterLabel: 'Door AI gegenereerd', tagColor: 'violet' },
+  copied: { label: 'Gekopieerd', filterLabel: 'Gekopieerd uit een ander document', tagColor: 'lintblauw' },
 }
 
 /** Text outside every span. Not a source, so it has no entry in SOURCES. */

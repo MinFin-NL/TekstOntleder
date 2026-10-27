@@ -74,12 +74,44 @@ ProvenanceSpan = Annotated[
 ]
 
 
+# --- Structure ---
+
+class StructureBlock(BaseSpan):
+    """What a stretch of text is in the document's layout, independent of where
+    it came from: a heading copied from a template is still a heading. Optional
+    and additive: a document without blocks is one run of text, as before."""
+
+    role: Literal["title", "subtitle", "section", "question", "answer"]
+
+
 class LJSONDocument(BaseModel):
     document_id: str
     format_version: str = "LJSON_1.0"
     document_hash: str
     text: str
     provenance_spans: List[ProvenanceSpan]
+    structure: List[StructureBlock] = []
+
+    @model_validator(mode='after')
+    def check_structure(self) -> 'LJSONDocument':
+        # Blocks lay the text out one after another, so unlike spans they may not nest.
+        text_length = len(self.text)
+        previous: Optional[tuple[int, StructureBlock]] = None
+        for i, block in sorted(enumerate(self.structure), key=lambda item: item[1].start_idx):
+            if block.end_idx > text_length:
+                raise PydanticCustomError(
+                    'block_bounds',
+                    'Block {index}: end_idx ({end_idx}) exceeds text length ({text_length})',
+                    {'index': i, 'end_idx': block.end_idx, 'text_length': text_length},
+                )
+            if previous and block.start_idx < previous[1].end_idx:
+                raise PydanticCustomError(
+                    'block_overlap',
+                    'Block {index} [{start_idx}, {end_idx}) overlaps block {other_index}',
+                    {'index': i, 'start_idx': block.start_idx, 'end_idx': block.end_idx, 'other_index': previous[0]},
+                )
+            previous = (i, block)
+        return self
 
     @model_validator(mode='after')
     def check_span_bounds(self) -> 'LJSONDocument':
